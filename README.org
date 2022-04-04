@@ -1,4 +1,4 @@
-* Intro
+* About
 
 Reaction time (RT) for items in psychometric questionnaires reflect participants' immediate mental status during thier response processes. Yet none of the popular data collection platforms allows collecting individual RT for each item. This demo provides an environment to collect such data based on various programming languages (R / JavaScript / PHP / HTML) that interactively work. It also contains randomized and pseudorandomized design strategies to organize the presentation order of a questionnaire in order to explore item effects and sequential effects in psychometric survey.
 
