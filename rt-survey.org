@@ -1,0 +1,664 @@
+* Intro
+
+Reaction time (RT) for items in psychometric questionnaires reflect participants' immediate mental status during thier response processes. Yet none of the popular data collection platforms allows collecting individual RT for each item. This demo provides an environment to collect such data based on various programming languages (R / JavaScript / PHP / HTML) that interactively work. It also contains randomized and pseudorandomized design strategies to organize the presentation order of a questionnaire in order to explore item effects and sequential effects in psychometric survey.
+
+* Setting up the server
+
+In my own PC I used port 3308 to set up the server but it should be 3306 in most of the time. So 3306 is used throughout this demo and I hope it works...
+
+** Dockerfile
+
+#+begin_src text :tangle server.Dockerfile
+FROM php:8.1.1-apache
+RUN docker-php-ext-install mysqli pdo pdo_mysql
+#+end_src
+
+** Docker-compose
+
+#+begin_src text :tangle docker-compose.yml
+
+version: '3.1'
+
+services:
+  php:
+    build:
+      context: .
+      dockerfile: server.Dockerfile
+    container_name: rt_survey_test
+    ports:
+      - 8080:80
+    links:
+      - "db:database"
+    restart: always
+    volumes:
+      - ./server/www:/var/www/html/
+  db:
+    container_name: db_rt_survey
+    image: mariadb
+    ports:
+      - 3306:3306
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: example
+	
+#+end_src
+
+* Initialize database using R
+
+** Database
+
+#+begin_src R :tangle R/init_db.R
+
+con <- DBI::dbConnect(
+              RMariaDB::MariaDB(),
+              host = '127.0.0.1',
+              port = '3306',
+              user = 'root',
+              password = 'example'
+            )
+
+DBI::dbSendStatement(con, 'CREATE DATABASE rt_survey_test;')
+
+DBI::dbDisconnect(con)
+
+#+end_src
+
+** Tables for storing data and recording id-order pairs
+
+*** Create table for response data and send it to mysql.
+#+begin_src R :tangle R/init_table.R
+
+con <- DBI::dbConnect(
+                RMariaDB::MariaDB(),
+                host = '127.0.0.1',
+                port = '3306',
+                user = 'root',
+                password = 'example',
+                dbname = 'rt_survey_test'
+)
+
+query <- "CREATE OR REPLACE TABLE response (
+p_id VARCHAR(999), 
+rt VARCHAR(999), 
+response VARCHAR(999), 
+Q_num VARCHAR(999), 
+trial_type VARCHAR(999), 
+trial_index VARCHAR(999), 
+order_index VARCHAR(999),
+time_elapsed VARCHAR(999), 
+internal_node_id VARCHAR(999)
+)"
+
+DBI::dbSendQuery(con, query)
+DBI::dbDisconnect(con)
+
+#+end_src
+
+*** Create table for recording presentation order in R.
+
+#+begin_src R :tangle R/generate_order.R
+
+options (tidyverse.quiet = TRUE)
+library (tidyverse)
+set.seed (666) ## since it would be sourced by other scripts it should be reproducible.
+
+## Method to generate a Latin-Square
+
+latin_template <- function(n){
+  
+  lat_sq <- array (rep (seq_len (n), each = n), c (n, n))
+  lat_sq <- apply (lat_sq - 1, 2, function (x) (x + 0:(n-1)) 
+                  %% n) + 1
+  
+  return(lat_sq)
+}
+
+## Generate a table including all the presentation order we want, and make it suitable for JavaScript.
+p_order_table <- function (q.length, rd.size = q.length) {
+  if (isTRUE (rd.size >= factorial(q.length))) {
+    stop ("number of expected randomzied order exceeded the maximum possible arrangments")
+  } else {
+    fx <- as_tibble (t ((1 : q.length)))
+    ls <- as_tibble (latin_template (q.length))
+    rd <- as_tibble (t (replicate (rd.size, sample (1: q.length, q.length, FALSE), TRUE)))
+    
+    ls_label <- paste0 (rep ("ls", length (ls)), 1:length (ls))
+    rd_label <- paste0 (rep ("rd", rd.size), 1: rd.size)
+    order_label <- c ("fx", ls_label, rd_label)
+    position_label <- paste0 ("p", 1: q.length)
+    
+    dat <- (bind_rows (fx, ls) %>% bind_rows (rd) - 1)
+    
+    order_table <- tibble (order_label = order_label) %>% bind_cols (dat)
+    colnames (order_table) [2: (q.length + 1)] <- position_label
+    return (order_table)
+  }
+}
+
+o.record <- p_order_table (q.length)
+
+f.record <- tibble (
+  order_label = o.record$order_label,
+  n = rep (0)
+)
+
+match.record <- tibble (p_id = "0",
+                        order_label = "0")
+match.record <- match.record[-1, ]
+
+#+end_src
+
+*** Send tables to mysql using Terminal (or Common Prompt in Windows)
+
+#+begin_src R :tangle R/init_trial.R
+
+args <- commandArgs(TRUE)
+
+if (length (args) == 0) {
+  stop ("The length of the questionnaire is needed, while the size of randomized order is optional.")
+}
+
+q.length <- as.numeric (args [1])
+
+if (is.na (args [2])) {
+  rd.size <- q.length
+} else {
+  rd.size <- as.numeric (args [2])
+}
+
+source ("R/generate_order.R")
+
+con <- DBI::dbConnect(
+                RMariaDB::MariaDB(),
+                host = '127.0.0.1',
+                port = '3306',
+                user = 'root',
+                password = 'example',
+                dbname = 'rt_survey_test'
+)
+
+## Before making sure the randomized orders will be exactly the same under a specific seed, only run once.
+
+DBI::dbWriteTable (con, paste0 ("order_list_", q.length), o.record, overwrite = TRUE)
+DBI::dbWriteTable (con, paste0 ("frequency_counter_", q.length), f.record, overwrite = TRUE)
+DBI::dbWriteTable (con, paste0 ("order_match_", q.length), match.record, overwrite = TRUE)
+
+query <- paste ("ALTER TABLE", paste0 ("order_match_", q.length), "MODIFY order_label VARCHAR(999)", sep = " ")
+
+rs <- DBI::dbSendStatement (con, query)
+DBI::dbClearResult (rs)
+
+query <- paste ("ALTER TABLE", paste0 ("order_match_", q.length), "MODIFY p_id VARCHAR(999)", sep = " ")
+
+rs <- DBI::dbSendStatement (con, query)
+DBI::dbClearResult (rs)
+
+DBI::dbDisconnect (con)
+
+#+end_src
+
+* Web
+
+** Backend
+
+*** Mariadb config
+
+#+begin_src text :tangle :tangle server/www/private/conf.ini
+
+[database]
+driver = mysql
+host = db_rt_survey
+port = 3306          
+dbname = rt_survey_test
+username = root
+password = example
+	
+#+end_src
+
+*** PHP connection class
+#+begin_src php :tangle server/www/private/dbConnect.php
+<?php
+class dbConnect {
+    private $pdo = null;
+
+    public function getPDO(){
+        return $this->pdo;
+    }
+
+    public function __construct(){
+        try {
+            $conf = parse_ini_file(__DIR__ . '/conf.ini', true);
+            $dsn = sprintf('mysql:host=%s;port=%s;dbname=%s', $conf['database']['host'], $conf['database']['port'], $conf['database']['dbname']);
+            $username = $conf['database']['username'];
+            $password = $conf['database']['password'];
+
+            $this->pdo = new PDO($dsn, $username, $password);
+            // set the PDO error mode to exception
+            $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        } catch(PDOException $e) {
+            echo "<script>console.log('Connection failed: " . $e->getMessage() . "')</script>";
+        }
+    }
+}
+
+?>
+#+end_src
+
+*** htaccess
+#+begin_src text :tangle server/www/private/.htaccess
+<Location />
+Order deny, allow
+</Location>
+#+end_src  
+
+*** php scripts
+
+Rely on fetch API mostly. The code here works but might not be efficient enough (I know...). Please help improving if you are willing to.
+
+**** match_order.php
+
+change =where n<1= in =$query= to set how many times each presentation order is assigned you want.
+#+begin_src php :tangle server/www/match_order.php
+<?php
+require_once(__DIR__ . '/private/dbConnect.php');
+$dbCon = new dbConnect();
+$pdo = $dbCon->getPDO();
+
+$json_string = json_decode(file_get_contents('php://input'), true);
+header('Content-Type: application/json; charset=utf-8');
+
+// $query = "select * from order_list_6 where order_label in (select order_label from frequency_counter_6 where n < 1) order by rand() limit 1";
+
+$query = "select * from order_list_3 where order_label in (select order_label from frequency_counter_3 where n < 1) order by rand() limit 1";
+
+try{
+    $sth = $pdo->query($query);
+
+    $result = $sth->fetchAll(PDO::FETCH_ASSOC);
+
+    header('Content-Type: application/json');
+    echo json_encode($result);
+} catch (PDOException $e) {
+    http_response_code (500);
+    echo $e-> getMessage ();
+};
+
+?>
+#+end_src
+
+**** postData.php
+#+begin_src php :tangle server/www/postData.php
+<?php
+
+require_once(__DIR__ . '/private/dbConnect.php');
+$dbCon = new dbConnect();
+$pdo = $dbCon->getPDO();
+
+$json_string = json_decode(file_get_contents('php://input'), true);
+
+header('Content-Type: application/json; charset=utf-8');
+
+$sql_proc = 'CALL ' . $json_string['proc_method'] . '(?)';
+
+$sth = $pdo->prepare($sql_proc);
+
+foreach ($json_string['json_trials'] as $x) {
+    $sth->bindValue(1, json_encode($x), PDO::PARAM_STR);
+    $sth->execute();
+};
+#+end_src
+
+**** postMatch.php
+This is VERY important since it records which participant received which presentation order. The subsquent assignment of orders will rely on this record (which is also my research goal).
+
+#+begin_src php :tangle server/www/postMatch.php
+<?php
+require_once(__DIR__ . '/private/dbConnect.php');
+$dbCon = new dbConnect();
+$pdo = $dbCon->getPDO();
+
+$json_string = json_decode(file_get_contents('php://input'), true);
+header('Content-Type: application/json; charset=utf-8');
+
+try {    
+    $data = array(
+        ':p_id' => $json_string['p_id'], 
+        ':order_label' => $json_string['order_label']
+    );
+    $test = $json_string['order_label'];
+
+// change table names in the code below when use questionnaires with different length.
+    
+    $querya = "INSERT INTO order_match_3 (p_id, order_label) VALUES (:p_id, :order_label)";
+    $stmt = $pdo->prepare($querya);
+    $stmt->execute($data);
+  
+    $queryb = "UPDATE frequency_counter_3 SET n = n + 1 WHERE order_label = ?";
+    $stmt = $pdo->prepare($queryb);
+    $stmt->execute([$test]);
+  
+} catch(PDOException $e) {
+    echo $e;
+};
+
+?>
+
+#+end_src
+
+** Frontend
+
+*** index.php
+#+begin_src html :tangle server/www/index.php
+<!DOCTYPE html>
+<html>
+  <head>
+    <title> Behaviour Survay </title>
+    <script src="https://unpkg.com/jspsych@7.0.0"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-html-button-response@1.0.0"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-survey-likert@1.0.0"></script>
+    <style>
+      .jspsych-btn {
+      margin-bottom: 10px;
+      }
+    </style>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/jspsych@7.0.0/css/jspsych.css"
+      />
+    <link rel="shortcut icon" href="#"/>  <!-- remove it in production -->
+  </head>
+  <body></body>
+  <!-- use module.js to connect js scripts. -->
+  <script type = "module" src= "test-survey.js"> </script>
+</html>
+
+#+end_src
+
+*** que-3.js
+A short questionnaire with 3 items just for testing.
+In formal survey you can add parameter =required: TRUE= right after =labels: likert= to force participants to answer the question displayed.
+#+begin_src js :tangle server/www/que-3.js
+// When specifying the Q-num, use strings "01" to "09" to match the presentation order.
+
+var instru = `how you feel like you are a...`;
+var likert = ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"];
+var trials = [];
+
+var start = {
+    type: jsPsychHtmlButtonResponse,
+    stimulus: '<p>Welcome to this behaviour survey, please press "start" to continue</p>',
+    choices: [`Start`],
+    data: { Q_num: `start` }
+};
+
+var blank = {
+    type: jsPsychHtmlButtonResponse,
+    stimulus: 'Press "Start" again to begin the survey',
+    choices: [`Start`],
+    data: { Q_num: 0 }
+};
+
+var show_data = {
+    type: jsPsychHtmlButtonResponse,
+    stimulus: `that's the end of this survey,thanks for your participation.`,
+    choices: ['Show results'],
+    data: { Q_num: `drop` }
+};
+
+var Q1 = {
+    type: jsPsychSurveyLikert,
+    questions: [{
+	prompt: "Q1.",
+	labels: likert
+    }],
+    preamble: instru,
+    data: { Q_num: `01`}
+};
+
+trials.push (Q1);
+
+var Q2 = {
+    type: jsPsychSurveyLikert,
+    questions: [{
+	prompt: "Q2.",
+	labels: likert
+    }],
+    preamble: instru,
+    data: { Q_num: `02`}
+};
+
+trials.push (Q2);
+
+var Q3 = {
+    type: jsPsychSurveyLikert,
+    questions: [{
+	prompt: "Q3.",
+	labels: likert
+    }],
+    preamble: instru,
+    data: { Q_num: `03`}
+};
+
+trials.push (Q3);
+
+export { start, blank, trials, show_data };
+
+#+end_src
+
+*** test-survey.js
+
+Since I used =async= funtion to assign presist presentation orders, the whole survey and related customized functions are needed to be wrapped into the resolve callback function.
+#+begin_src js :tangle server/www/test-survey.js
+
+// ------- Functions to set up database connection ----------
+
+const getData = async (data, uri) => {
+    const settings_get = {
+        method: 'POST',
+        headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+    };
+    try {
+        const fetchOrder = await fetch(uri, settings_get);
+        const data = await fetchOrder.json();
+        return data;
+    } catch (e) {
+        console.log(e);
+    }
+};
+
+const getOrder = async () => {
+    let data = await getData({}, 'match_order.php');
+    return data;
+};
+
+// --------- Setting up questionnaire. -------------
+// import { start, blank, trials, show_data } from './que-6.js';
+import { start, blank, trials, show_data } from './que-3.js';
+console.log (trials);
+// --------- Initializing jsPsych and posting response to database ----------
+
+const postData = async (data, uri) => {
+    const settings_post = {
+	method: 'POST',
+	headers: {
+	    Accept: 'application/json',
+	    'Content-Type': 'application/json'
+	},
+	body: JSON.stringify(data)
+    };
+    try {
+	const fetchResponse = await fetch(uri, settings_post);
+	const data = await fetchResponse.json();
+	console.log (data);
+	return data;
+    } catch (e) {
+	console.log(e);
+    }
+};
+
+let promiseSuccess = (data) => {
+    if (data.length == 0) {
+	document.write ('all presentation orders are fully assigned, please run "Rscript reset_counter.R" in terminal to run this survey again');
+	throw 'all presentation orders are fully assigned, please run "Rscript reset_counter.R" in terminal to run this survey again';
+    } else {
+    var order_label = Object.values (data[0]);
+    let order = order_label.slice (1, order_label.length).map (x => x + 1);
+    
+    if (order.length < 10) {
+	var order_str = order.map (i => "0" + i);
+    } else {
+	for (j; j <= order.length - 1; j++) {
+	    let element = order[j];
+	    if (element.length == 1) {
+		temp = "0" + element;
+		order_str.push (temp);
+	    } else {
+		order_str.push (order[j]);
+	    }
+	}
+    };
+    };
+
+// use async function to get presentation order from mysql
+    
+var jsPsych = initJsPsych({
+    on_finish: function () {
+	var p_id = jsPsych.randomization.randomID(4);
+	jsPsych.data.addProperties({order_index: method,
+				    p_id: p_id});
+	var match = {
+	    p_id: p_id,
+	    order_label: method
+	};
+	console.log (match);
+	let json = jsPsych.data.get()
+	    .filterCustom(trial => trial.trial_type == 'survey-likert')
+	    .ignore('question_order');
+	let json_trials = json.trials.map(x => {
+	    let question = Object.keys(x.response)[0];
+	    let response = x.response[question];
+	    return ({
+		p_id: x.p_id,
+		rt: x.rt,
+		response: x.response,
+		Q_num: x.Q_num,
+		trial_type: x.trial_type,
+		trial_index: x.trial_index,
+		order_index: x.order_index,
+		time_elapsed: x.time_elapsed,
+		internal_node_id: x.internal_node_id
+	    })
+	});
+	document.write (json_trials[0]);
+	console.log (json_trials[0]);
+	let trial_data = {
+	    json_trials: json_trials,
+	    proc_method: 'insertLikertResp'
+	};
+	postData (match, 'postMatch.php');
+	postData (trial_data, 'postData.php');
+	console.log(JSON.stringify(trial_data));
+    }
+});
+
+// ----------- Reorganize questions based on the given order. -------------
+    
+    var new_order = []; 
+    var v = 0;
+    var id = 0;
+    console.log (trials[id].data);
+    for (v; v < order_str.length; v++) {
+	while (trials[id].data.Q_num != order_str[v]) {
+	    id++;;
+	}
+	new_order.push (trials[id]);
+	id = 0; // repeatly matching.
+    };
+    console.log (order_label);
+    console.log (new_order);
+    var method = order_label [0];
+    var fin_order = {timeline: new_order};
+    jsPsych.run([start, blank, fin_order, show_data]); 
+};
+
+var presOrder = getOrder();
+
+presOrder.then(promiseSuccess, (err) => {
+    console.log(error);
+});
+
+#+end_src
+
+*** Reset the frequenct counter using R
+
+After all presentation orders are fully assigned, you need to turn back to terminal (or command prompt on Windows) to reset the counter by execute a R script if you want to enlarge the sample
+
+#+begin_src R :tangle R/reset_counter.R 
+con <- DBI::dbConnect(
+                RMariaDB::MariaDB(),
+                host = '127.0.0.1',
+                port = '3306',
+                user = 'root',
+                password = 'example',
+                dbname = 'rt_survey_test'
+)
+
+## query <- "update frequency_counter_6 set n = 0"
+
+query <- "update frequency_counter_3 set n = 0"
+
+rs <- DBI::dbSendStatement (con, query)
+DBI::dbClearResult (rs)
+DBI::dbDisconnect (con)
+#+end_src
+
+* Analysis
+
+** Checkresponse
+Run the following code in terminal (or command prompt on Windows), type the length of the questionnaire to check the corresponding tables (e.g., if your questionnaire is 6-item long, type =Rscript R/check_response.R 6=). Actually the only table we need to focus is =que_rd_test_n= but it's sometimes useful to see the other record.
+#+begin_src R :tangle R/check_response.R
+arg <- as.numeric (commandArgs (TRUE))
+
+re.name <- paste0 ("que_rd_test", arg)
+r.name <- paste0 ("order_list_", arg)
+f.name <- paste0 ("frequency_counter_", arg)
+o.name <- paste0 ("order_match_", arg)
+
+
+library(DBI)
+library(tidyverse)
+    
+con <- DBI::dbConnect(
+              RMariaDB::MariaDB(),
+              host = '127.0.0.1',
+              port = '3306',
+              user = 'root',
+              password = 'example',
+              dbname = 'rt_survey_test'
+            )
+    
+response <- tbl (con, re.name) %>%
+  collect()
+
+frequency <- tbl (con, f.name) %>% 
+  collect ()
+
+order <- tbl (con, o.name) %>% 
+  collect ()
+
+match <- tbl (con, m.name) %>%
+  collect ()
+
+
+dbDisconnect(con)
+head (response)
+head (frequency)
+head (order)
+head (match)
+
+#+end_src
+

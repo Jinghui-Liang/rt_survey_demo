@@ -1,0 +1,23 @@
+version: '3.1'
+
+services:
+  php:
+    build:
+      context: .
+      dockerfile: server.Dockerfile
+    container_name: rt_survey_test
+    ports:
+      - 8080:80
+    links:
+      - "db:database"
+    restart: always
+    volumes:
+      - ./server/www:/var/www/html/
+  db:
+    container_name: db_rt_survey
+    image: mariadb
+    ports:
+      - 3306:3306
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: example
