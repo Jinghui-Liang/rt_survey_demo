@@ -2,6 +2,34 @@
 
 Reaction time (RT) for items in psychometric questionnaires reflect participants' immediate mental status during thier response processes. Yet none of the popular data collection platforms allows collecting individual RT for each item. This demo provides an environment to collect such data based on various programming languages (R / JavaScript / PHP / HTML) that interactively work. It also contains randomized and pseudorandomized design strategies to organize the presentation order of a questionnaire in order to explore item effects and sequential effects in psychometric survey.
 
+** Quick start
+
+Put the lines below in termianl (or command prompt on Windows)
+#+begin_src shell :results silent
+git clone https://github.com/Jinghui-Liang/rt_survey_demo.git
+cd rt_survey_demo
+docker-compose up -d --build
+#+end_src
+
+Initialize database / all necessary tables with lines below
+
+#+begin_src shell :results silent
+Rscript R/init_db.R
+Rscript R/init_table.R
+Rscript R/init_trial.R 3
+#+end_src
+
+Then put =localhost:8080/index.php= on browser to check if it works. If it works well, run the survey 7 times with different presentation orders (1 fixed order + 3 fully randomized orders + 3 pseudorandomized orders) of the example questionnaire.
+
+Next, you will see "all presentation orders are fully assigned, please run "Rscript reset_counter.R" in terminal to run this survey again" displayed on the screen. If you want to rerun the survey or to enlarge your sample size, turn back to terminal and put:
+
+#+begin_src shell
+Rscript R/reset_counter.R
+#+end_src
+
+and refresh the webpage. It should keep on running.
+
+There must be lots of solution to simplify my code and I'll try to keep on working on it.
 * Setting up the server
 
 In my own PC I used port 3308 to set up the server but it should be 3306 in most of the time. So 3306 is used throughout this demo and I hope it works...
