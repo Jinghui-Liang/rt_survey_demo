@@ -17,6 +17,7 @@ Initialize database / all necessary tables with lines below
 Rscript R/init_db.R
 Rscript R/init_table.R
 Rscript R/init_trial.R 3
+Rscript R/insertProc.R
 #+end_src
 
 Then put =localhost:8080/index.php= on browser to check if it works. If it works well, run the survey 7 times with different presentation orders (1 fixed order + 3 fully randomized orders + 3 pseudorandomized orders) of the example questionnaire.
