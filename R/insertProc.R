@@ -3,7 +3,7 @@ con <- DBI::dbConnect(
               host = '127.0.0.1',
               port = '3306',
               user = 'root',
-              password = 'gt56fr43',
+              password = 'example',
               dbname = 'rt_survey_test'
             )
 
