@@ -73,7 +73,6 @@ services:
 #+end_src
 
 * Initialize database using R
-
 ** Database
 
 #+begin_src R :tangle R/init_db.R

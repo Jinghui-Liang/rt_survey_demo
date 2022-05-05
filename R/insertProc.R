@@ -1,10 +1,10 @@
 con <- DBI::dbConnect(
               RMariaDB::MariaDB(),
               host = '127.0.0.1',
-              port = '3308',
+              port = '3306',
               user = 'root',
               password = 'gt56fr43',
-              dbname = 'test_que'
+              dbname = 'rt_survey_test'
             )
 
 query <- "CREATE OR REPLACE PROCEDURE insertLikertResp(IN json VARCHAR(9999))
