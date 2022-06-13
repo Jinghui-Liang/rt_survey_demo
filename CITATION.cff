@@ -1,0 +1,14 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: "Liang"
+given-names: "Jinghui"
+
+- family-names: "Barr"
+given-names: "Dale"
+
+title: "Detecting Item and Sequential Effects in Psychometric Surveys: A Demo of Our New Platform"
+version: 1.0.0
+
+date-released: 2022-4-30
+url: "https://github.com/Jinghui-Liang/rt_survey_demo.git"
