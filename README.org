@@ -696,38 +696,19 @@ head (match)
 #+begin_src text :tangle ./CITATION.cff
 
 cff-version: 1.2.0
-message: "If you use this software, please cite it as below."
+title: >-
+  Detecting Item and Sequential Effects in
+  Psychometric Surveys: A Demo Platform
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
 authors:
-- family-names: "Liang"
-given-names: "Jinghui"
-
-- family-names: "Barr"
-given-names: "Dale"
-
-title: "Detecting Item and Sequential Effects in Psychometric Surveys: A Demo of Our New Platform"
-version: 1.0.0
-
-date-released: 2022-4-30
-url: "https://github.com/Jinghui-Liang/rt_survey_demo.git"	
-
-#+end_src
-
-.bib file
-#+begin_src text :tangle ./CITATION.bib
-
-cff-version: 1.2.0
-message: "If you use this software, please cite it as below."
-authors:
-- family-names: "Liang"
-given-names: "Jinghui"
-
-- family-names: "Barr"
-given-names: "Dale"
-
-title: "Detecting Item and Sequential Effects in Psychometric Surveys: A Demo of Our New Platform"
-version: 1.0.0
-
-date-released: 2022-4-30
-url: "https://github.com/Jinghui-Liang/rt_survey_demo.git"	
+  - given-names: Jinghui
+    family-names: Liang
+  - given-names: Alistair
+    family-names: Beith
+  - given-names: Dale
+    family-names: Barr
 
 #+end_src
