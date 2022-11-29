@@ -28,8 +28,8 @@ var show_data = {
 var Q1 = {
     type: jsPsychSurveyLikert,
     questions: [{
-	prompt: "Q1.",
-	labels: likert
+  prompt: "Q1.",
+  labels: likert
     }],
     preamble: instru,
     data: { Q_num: `01`}
@@ -40,8 +40,8 @@ trials.push (Q1);
 var Q2 = {
     type: jsPsychSurveyLikert,
     questions: [{
-	prompt: "Q2.",
-	labels: likert
+  prompt: "Q2.",
+  labels: likert
     }],
     preamble: instru,
     data: { Q_num: `02`}
@@ -52,8 +52,8 @@ trials.push (Q2);
 var Q3 = {
     type: jsPsychSurveyLikert,
     questions: [{
-	prompt: "Q3.",
-	labels: likert
+  prompt: "Q3.",
+  labels: likert
     }],
     preamble: instru,
     data: { Q_num: `03`}

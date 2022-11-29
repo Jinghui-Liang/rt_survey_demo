@@ -1,8 +1,7 @@
 * About
 
-Reaction time (RT) for items in psychometric questionnaires reflect participants' immediate mental status during thier response processes. Yet none of the popular data collection platforms allows collecting individual RT for each item. This demo provides an environment to collect such data based on various programming languages (R / JavaScript / PHP / HTML) that interactively work. It also contains randomized and pseudorandomized design strategies to organize the presentation order of a questionnaire in order to explore item effects and sequential effects in psychometric survey.
-
-** Quick start
+Reaction time (RT) for items in psychometric questionnaires reflect participants' immediate mental status during thier response processes. Yet none of the popular data collection platforms allow collecting individual RT for each item. This demo provides an environment to collect such data based on various programming languages (R / JavaScript / PHP / HTML) that interactively work. It also contains randomized and pseudorandomized design strategies to organize the presentation order of a questionnaire in order to explore item effects and sequential effects in psychometric survey.
+** Quick start (local test)
 
 Put the lines below in termianl (or command prompt on Windows)
 #+begin_src shell :results silent
@@ -31,9 +30,26 @@ Rscript R/reset_counter.R
 and refresh the webpage. It should keep on running.
 
 There must be lots of solution to simplify my code and I'll try to keep on working on it.
-* Setting up the server
 
-In my own PC I used port 3308 to set up the server but it should be 3306 in most of the time. So 3306 is used throughout this demo and I hope it works...
+** Launching your platform on server
+
+Open =.env= with a editor you like and change the config to the corresponding values you have on the server. 
+For Emacs user, use =C-c C-v C-t= to enable changes with this block. Then call this R function 
+
+#+CALL: create-db-conf()
+
+by =C-c C-c=. This R function generate a conf file to make sure that all the ports and names match.
+
+#+begin_src text :tangle .env
+HTTP_PORT=8080
+SQL_PORT=3306
+SERVER_NAME=php2
+DB_NAME=db2
+DB_PASS=example
+MARIADB_VER=10.4
+#+end_src
+
+* Setting up the server
 
 ** Dockerfile
 
@@ -73,22 +89,57 @@ services:
 #+end_src
 
 * Initialize database using R
+
+** One system file to generate the database and tables
+
+You might already have corresponding database set up on a server. However if you want to test or modify anything on your local machine, this binary will automatically set up a database.
+
+#+begin_src R :shebang "#!/usr/bin/env Rscript" :tangle-mode (identity #o755) :tangle ConfigDB_server
+
+prompt1 <- "Please type the name of your questionnaire (in abbreviative form) "
+prompt2 <- "Please type the length of your questionnaire "
+prompt3 <- "local or server config?"
+cat(prompt1)
+qname <- readLines("stdin", n = 1)
+cat(prompt2)
+qlen <- readLines("stdin", n = 1) |> as.integer()
+cat(prompt3)
+position <- readLines("stdin", n = 1)
+cat ("Arguments accepted, inatialising ......")
+
+if (position == "local") {
+  source ("R/init_db.R")}
+source ("R/init_table.R")
+source ("R/init_trial.R")
+source ("R/insertProc.R")
+
+cat("DONE")
+
+#+end_src
+
 ** Database
 
 #+begin_src R :tangle R/init_db.R
+if (interactive()) {
+  qname <- "test_que"
+} else {
+  qname <- qname}
+
+readRenviron(".env")
 
 con <- DBI::dbConnect(
               RMariaDB::MariaDB(),
               host = '127.0.0.1',
-              port = '3306',
+              port = Sys.getenv('SQL_PORT'),
               user = 'root',
-              password = 'example'
+              password = Sys.getenv('DB_PASS')
             )
 
-DBI::dbSendStatement(con, 'CREATE DATABASE rt_survey_test;')
+stmt_db <- paste ('CREATE DATABASE', qname)
+
+DBI::dbSendStatement(con, stmt_db)
 
 DBI::dbDisconnect(con)
-
 #+end_src
 
 ** Tables for storing data and recording id-order pairs
@@ -406,70 +457,70 @@ try {
 A short questionnaire with 3 items just for testing.
 In formal survey you can add parameter =required: TRUE= right after =labels: likert= to force participants to answer the question displayed.
 #+begin_src js :tangle server/www/que-3.js
-// When specifying the Q-num, use strings "01" to "09" to match the presentation order.
+  // When specifying the Q-num, use strings "01" to "09" to match the presentation order.
 
-var instru = `how you feel like you are a...`;
-var likert = ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"];
-var trials = [];
+  var instru = `how you feel like you are a...`;
+  var likert = ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"];
+  var trials = [];
 
-var start = {
-    type: jsPsychHtmlButtonResponse,
-    stimulus: '<p>Welcome to this behaviour survey, please press "start" to continue</p>',
-    choices: [`Start`],
-    data: { Q_num: `start` }
-};
+  var start = {
+      type: jsPsychHtmlButtonResponse,
+      stimulus: '<p>Welcome to this behaviour survey, please press "start" to continue</p>',
+      choices: [`Start`],
+      data: { Q_num: `start` }
+  };
 
-var blank = {
-    type: jsPsychHtmlButtonResponse,
-    stimulus: 'Press "Start" again to begin the survey',
-    choices: [`Start`],
-    data: { Q_num: 0 }
-};
+  var blank = {
+      type: jsPsychHtmlButtonResponse,
+      stimulus: 'Press "Start" again to begin the survey',
+      choices: [`Start`],
+      data: { Q_num: 0 }
+  };
 
-var show_data = {
-    type: jsPsychHtmlButtonResponse,
-    stimulus: `that's the end of this survey,thanks for your participation.`,
-    choices: ['Show results'],
-    data: { Q_num: `drop` }
-};
+  var show_data = {
+      type: jsPsychHtmlButtonResponse,
+      stimulus: `that's the end of this survey,thanks for your participation.`,
+      choices: ['Show results'],
+      data: { Q_num: `drop` }
+  };
 
-var Q1 = {
-    type: jsPsychSurveyLikert,
-    questions: [{
-	prompt: "Q1.",
-	labels: likert
-    }],
-    preamble: instru,
-    data: { Q_num: `01`}
-};
+  var Q1 = {
+      type: jsPsychSurveyLikert,
+      questions: [{
+    prompt: "Q1.",
+    labels: likert
+      }],
+      preamble: instru,
+      data: { Q_num: `01`}
+  };
 
-trials.push (Q1);
+  trials.push (Q1);
 
-var Q2 = {
-    type: jsPsychSurveyLikert,
-    questions: [{
-	prompt: "Q2.",
-	labels: likert
-    }],
-    preamble: instru,
-    data: { Q_num: `02`}
-};
+  var Q2 = {
+      type: jsPsychSurveyLikert,
+      questions: [{
+    prompt: "Q2.",
+    labels: likert
+      }],
+      preamble: instru,
+      data: { Q_num: `02`}
+  };
 
-trials.push (Q2);
+  trials.push (Q2);
 
-var Q3 = {
-    type: jsPsychSurveyLikert,
-    questions: [{
-	prompt: "Q3.",
-	labels: likert
-    }],
-    preamble: instru,
-    data: { Q_num: `03`}
-};
+  var Q3 = {
+      type: jsPsychSurveyLikert,
+      questions: [{
+    prompt: "Q3.",
+    labels: likert
+      }],
+      preamble: instru,
+      data: { Q_num: `03`}
+  };
 
-trials.push (Q3);
+  trials.push (Q3);
 
-export { start, blank, trials, show_data };
+  export { start, blank, trials, show_data };
 
 #+end_src
 
