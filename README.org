@@ -65,10 +65,8 @@ which will ask you the name of database and the length of questionnaire. Also, t
 
 When you see =DONE= displayed on shell and if
 
-1) you are running local test, you will see ...
+1) you are running local test, you can log in to your survey on your browser by =127.0.0.1:8080= or =localhost:8080=. The corresponding database can be accessed by shell command =mysql -h 127.0.0.1 -u root -P 3306 -p=, with password =example=.
 2) you are about to run this platform online, you can upload the =www= folder to your server (located on =./server/www=) and you are good to go.
-
-
 
 * Setting up the server
 
@@ -81,8 +79,7 @@ RUN docker-php-ext-install mysqli pdo pdo_mysql
 
 ** Docker-compose
 
-#+begin_src text :tangle docker-compose.yml
-
+#+begin_src yaml :tangle docker-compose.yml
 version: '3.1'
 
 services:
@@ -90,23 +87,22 @@ services:
     build:
       context: .
       dockerfile: server.Dockerfile
-    container_name: rt_survey_test
+    container_name: ${SERVER_NAME}
     ports:
-      - 8080:80
+      - ${HTTP_PORT}:80
     links:
       - "db:database"
     restart: always
     volumes:
       - ./server/www:/var/www/html/
   db:
-    container_name: db_rt_survey
-    image: mariadb
+    container_name: ${DB_NAME}
+    image: mariadb:${MARIADB_VER}
     ports:
-      - 3306:3306
+      - ${SQL_PORT}:3306
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: example
-	
+      MYSQL_ROOT_PASSWORD: ${DB_PASS}
 #+end_src
  
 * Initialize database using R
@@ -140,9 +136,10 @@ cat("DONE")
 
 ** Database
 
+If you are testing on your local machine you need to manually set up the database
 #+begin_src R :tangle R/init_db.R
 if (interactive()) {
-  qname <- "test_que"
+  qname <- "test"
 } else {
   qname <- qname}
 
@@ -167,37 +164,45 @@ DBI::dbDisconnect(con)
 
 *** Create table for response data and send it to mysql.
 #+begin_src R :tangle R/init_table.R
+readRenviron(".env")
 
-con <- DBI::dbConnect(
-                RMariaDB::MariaDB(),
-                host = '127.0.0.1',
-                port = '3306',
-                user = 'root',
-                password = 'example',
-                dbname = 'rt_survey_test'
-)
-
+if (position == "local"){
+  con_t <- DBI::dbConnect(
+                  RMariaDB::MariaDB(),
+                  host = '127.0.0.1',
+                  port = Sys.getenv('SQL_PORT'),
+                  user = 'root',
+                  password = Sys.getenv('DB_PASS'),
+                  dbname = qname ## 'qname' has been defined in 'init_db.R'
+                )
+} else if (position == "server"){
+  con_t <- DBI::dbConnect(
+                  RMariaDB::MariaDB(),
+                  host = Sys.getenv('SERVER_NAME'),
+                  port = Sys.getenv('SQL_PORT'),
+                  ## user = 'tlabusr',
+                  password = Sys.getenv('DB_PASS'),
+                  ## dbname = 'IPIP'
+                )} else {
+                   stop ('arguments must be either "local" or "server"')}
 query <- "CREATE OR REPLACE TABLE response (
-p_id VARCHAR(999), 
-rt VARCHAR(999), 
-response VARCHAR(999), 
-Q_num VARCHAR(999), 
-trial_type VARCHAR(999), 
-trial_index VARCHAR(999), 
-order_index VARCHAR(999),
-time_elapsed VARCHAR(999), 
-internal_node_id VARCHAR(999)
-)"
+      p_id VARCHAR(999), 
+      rt VARCHAR(999), 
+      response VARCHAR(999), 
+      Q_num VARCHAR(999), 
+      trial_type VARCHAR(999), 
+      trial_index VARCHAR(999), 
+      order_index VARCHAR(999),
+      time_elapsed VARCHAR(999), 
+      internal_node_id VARCHAR(999)
+      )"
 
-DBI::dbSendQuery(con, query)
-DBI::dbDisconnect(con)
-
+DBI::dbSendQuery(con_t, query)
 #+end_src
 
 *** Create table for recording presentation order in R.
 
-#+begin_src R :tangle R/generate_order.R
-
+#+begin_src R :results silent :tangle R/generate_order.R
 options (tidyverse.quiet = TRUE)
 library (tidyverse)
 set.seed (666) ## since it would be sourced by other scripts it should be reproducible.
@@ -205,37 +210,37 @@ set.seed (666) ## since it would be sourced by other scripts it should be reprod
 ## Method to generate a Latin-Square
 
 latin_template <- function(n){
-  
+
   lat_sq <- array (rep (seq_len (n), each = n), c (n, n))
   lat_sq <- apply (lat_sq - 1, 2, function (x) (x + 0:(n-1)) 
-                  %% n) + 1
-  
+                   %% n) + 1
+
   return(lat_sq)
 }
 
 ## Generate a table including all the presentation order we want, and make it suitable for JavaScript.
-p_order_table <- function (q.length, rd.size = q.length) {
-  if (isTRUE (rd.size >= factorial(q.length))) {
+p_order_table <- function (qlen, rd.size = qlen) {
+  if (isTRUE (rd.size >= factorial(qlen))) {
     stop ("number of expected randomzied order exceeded the maximum possible arrangments")
   } else {
-    fx <- as_tibble (t ((1 : q.length)))
-    ls <- as_tibble (latin_template (q.length))
-    rd <- as_tibble (t (replicate (rd.size, sample (1: q.length, q.length, FALSE), TRUE)))
-    
+    fx <- as_tibble (t ((1 : qlen)))
+    ls <- as_tibble (latin_template (qlen))
+    rd <- as_tibble (t (replicate (rd.size, sample (1: qlen, qlen, FALSE), TRUE)))
+
     ls_label <- paste0 (rep ("ls", length (ls)), 1:length (ls))
     rd_label <- paste0 (rep ("rd", rd.size), 1: rd.size)
     order_label <- c ("fx", ls_label, rd_label)
-    position_label <- paste0 ("p", 1: q.length)
-    
+    position_label <- paste0 ("p", 1: qlen)
+
     dat <- (bind_rows (fx, ls) %>% bind_rows (rd) - 1)
-    
+
     order_table <- tibble (order_label = order_label) %>% bind_cols (dat)
-    colnames (order_table) [2: (q.length + 1)] <- position_label
+    colnames (order_table) [2: (qlen + 1)] <- position_label
     return (order_table)
   }
 }
 
-o.record <- p_order_table (q.length)
+o.record <- p_order_table (qlen)
 
 f.record <- tibble (
   order_label = o.record$order_label,
@@ -247,53 +252,60 @@ match.record <- tibble (p_id = "0",
 match.record <- match.record[-1, ]
 
 #+end_src
-
+  
 *** Send tables to mysql using Terminal (or Common Prompt in Windows)
 
 #+begin_src R :tangle R/init_trial.R
+source ("./generate_order.R")
 
-args <- commandArgs(TRUE)
+DBI::dbWriteTable (con_t, "order_list", o.record, overwrite = TRUE)
+DBI::dbWriteTable (con_t, "frequency_counter", f.record, overwrite = TRUE)
+DBI::dbWriteTable (con_t, "order_match", match.record, overwrite = TRUE)
 
-if (length (args) == 0) {
-  stop ("The length of the questionnaire is needed, while the size of randomized order is optional.")
-}
+query <- paste ("ALTER TABLE", "order_match", "MODIFY order_label VARCHAR(999)", sep = " ")
 
-q.length <- as.numeric (args [1])
-
-if (is.na (args [2])) {
-  rd.size <- q.length
-} else {
-  rd.size <- as.numeric (args [2])
-}
-
-source ("R/generate_order.R")
-
-con <- DBI::dbConnect(
-                RMariaDB::MariaDB(),
-                host = '127.0.0.1',
-                port = '3306',
-                user = 'root',
-                password = 'example',
-                dbname = 'rt_survey_test'
-)
-
-## Before making sure the randomized orders will be exactly the same under a specific seed, only run once.
-
-DBI::dbWriteTable (con, paste0 ("order_list_", q.length), o.record, overwrite = TRUE)
-DBI::dbWriteTable (con, paste0 ("frequency_counter_", q.length), f.record, overwrite = TRUE)
-DBI::dbWriteTable (con, paste0 ("order_match_", q.length), match.record, overwrite = TRUE)
-
-query <- paste ("ALTER TABLE", paste0 ("order_match_", q.length), "MODIFY order_label VARCHAR(999)", sep = " ")
-
-rs <- DBI::dbSendStatement (con, query)
+rs <- DBI::dbSendStatement (con_t, query)
 DBI::dbClearResult (rs)
 
-query <- paste ("ALTER TABLE", paste0 ("order_match_", q.length), "MODIFY p_id VARCHAR(999)", sep = " ")
+query <- paste ("ALTER TABLE", "order_match", "MODIFY p_id VARCHAR(999)", sep = " ")
 
-rs <- DBI::dbSendStatement (con, query)
+rs <- DBI::dbSendStatement (con_t, query)
 DBI::dbClearResult (rs)
 
-DBI::dbDisconnect (con)
+
+query <- paste ("CREATE OR REPLACE TABLE", "demo", "(
+    p_id VARCHAR(999),
+    age VARCHAR (999), 
+    gender VARCHAR(999) 
+    )")
+
+rs <- DBI::dbSendStatement (con_t, query)
+DBI::dbClearResult (rs)
+
+#+end_src
+
+** Insert and store procedure (to handle with accepted data) in MySQL
+
+#+begin_src R :tangle R/insertProc.R
+
+query <- "CREATE OR REPLACE PROCEDURE insertLikertResp(IN json VARCHAR(9999))
+    INSERT INTO response (p_id, rt, response, Q_num, trial_type, trial_index, order_index, time_elapsed, internal_node_id)
+    VALUES(
+      JSON_EXTRACT(json, '$.p_id'),
+      JSON_EXTRACT(json, '$.rt'),
+      JSON_EXTRACT(json, '$.response'),
+      JSON_EXTRACT(json, '$.Q_num'),
+      JSON_EXTRACT(json, '$.trial_type'),
+      JSON_EXTRACT(json, '$.trial_index'),
+      JSON_EXTRACT(json, '$.order_index'),
+      JSON_EXTRACT(json, '$.time_elapsed'),
+      JSON_EXTRACT(json, '$.internal_node_id')
+   )"
+
+rs <- DBI::dbSendStatement (con_t, query)
+DBI::dbClearResult (rs)
+
+DBI::dbDisconnect(con_t)
 
 #+end_src
 
@@ -301,18 +313,18 @@ DBI::dbDisconnect (con)
 
 ** Backend
 
-*** Mariadb config
+*** TODO Mariadb config
 
-#+begin_src text :tangle :tangle server/www/private/conf.ini
+figure out how to generate dbname from =.env=
 
-[database]
-driver = mysql
-host = db_rt_survey
-port = 3306          
-dbname = rt_survey_test
-username = root
-password = example
-	
+#+begin_src R :results silent :tangle R/db_conf.R
+readRenviron(".env")
+
+template <- "[database]\ndriver = mysql\nhost = %s\nport = %s\ndbname = ipip\nusername = root\npassword = %s"
+
+conf <- sprintf(template, Sys.getenv('DB_NAME'), 3306, Sys.getenv('DB_PASS'))
+
+writeLines(conf, 'server/www/private/conf.ini')
 #+end_src
 
 *** PHP connection class
@@ -320,18 +332,18 @@ password = example
 <?php
 class dbConnect {
     private $pdo = null;
-
+      
     public function getPDO(){
         return $this->pdo;
     }
-
+      
     public function __construct(){
         try {
             $conf = parse_ini_file(__DIR__ . '/conf.ini', true);
             $dsn = sprintf('mysql:host=%s;port=%s;dbname=%s', $conf['database']['host'], $conf['database']['port'], $conf['database']['dbname']);
             $username = $conf['database']['username'];
             $password = $conf['database']['password'];
-
+      
             $this->pdo = new PDO($dsn, $username, $password);
             // set the PDO error mode to exception
             $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -340,7 +352,6 @@ class dbConnect {
         }
     }
 }
-
 ?>
 #+end_src
 
@@ -365,19 +376,25 @@ $dbCon = new dbConnect();
 $pdo = $dbCon->getPDO();
 
 $json_string = json_decode(file_get_contents('php://input'), true);
-header('Content-Type: application/json; charset=utf-8');
 
-// $query = "select * from order_list_6 where order_label in (select order_label from frequency_counter_6 where n < 1) order by rand() limit 1";
-
-$query = "select * from order_list_3 where order_label in (select order_label from frequency_counter_3 where n < 1) order by rand() limit 1";
+$query = "SELECT * FROM order_list WHERE order_label IN
+                          (SELECT order_label FROM frequency_counter WHERE
+                             (CASE
+                                WHEN (select (select n from frequency_counter where order_label = 'fx') < 50)
+                                  THEN order_label = 'fx' OR (order_label != 'fx' AND n < 2)
+                                ELSE order_label != 'fx' AND n < 2
+                              END)
+                           )
+                        ORDER BY RAND() LIMIT 1";
 
 try{
     $sth = $pdo->query($query);
 
     $result = $sth->fetchAll(PDO::FETCH_ASSOC);
 
-    header('Content-Type: application/json');
+    header('Content-Type: application/json; charset=utf-8');
     echo json_encode($result);
+
 } catch (PDOException $e) {
     http_response_code (500);
     echo $e-> getMessage ();
@@ -389,22 +406,28 @@ try{
 **** postData.php
 #+begin_src php :tangle server/www/postData.php
 <?php
-
 require_once(__DIR__ . '/private/dbConnect.php');
 $dbCon = new dbConnect();
 $pdo = $dbCon->getPDO();
 
 $json_string = json_decode(file_get_contents('php://input'), true);
+       
+try{
 
-header('Content-Type: application/json; charset=utf-8');
+    $sql_proc = 'CALL ' . $json_string['proc_method'] . '(?)';
 
-$sql_proc = 'CALL ' . $json_string['proc_method'] . '(?)';
+    $sth = $pdo->prepare($sql_proc);
 
-$sth = $pdo->prepare($sql_proc);
+    foreach ($json_string['json_trials'] as $x) {
+        $sth->bindValue(1, json_encode($x), PDO::PARAM_STR);
+        $sth->execute();
+    };
 
-foreach ($json_string['json_trials'] as $x) {
-    $sth->bindValue(1, json_encode($x), PDO::PARAM_STR);
-    $sth->execute();
+    echo 'success';
+
+}catch(PDOException $e){
+    http_response_code(500);
+    echo $e -> getMessage();
 };
 #+end_src
 
@@ -416,36 +439,81 @@ This is VERY important since it records which participant received which present
 require_once(__DIR__ . '/private/dbConnect.php');
 $dbCon = new dbConnect();
 $pdo = $dbCon->getPDO();
-
+       
 $json_string = json_decode(file_get_contents('php://input'), true);
-header('Content-Type: application/json; charset=utf-8');
-
+       
 try {    
     $data = array(
         ':p_id' => $json_string['p_id'], 
         ':order_label' => $json_string['order_label']
     );
     $test = $json_string['order_label'];
-
-// change table names in the code below when use questionnaires with different length.
     
-    $querya = "INSERT INTO order_match_3 (p_id, order_label) VALUES (:p_id, :order_label)";
+
+    // -- new here
+    $email = array(
+        ':p_id' => $json_string['p_id'], 
+        ':email' => $json_string['email']
+    );
+    // -- new ends
+       
+    // change table names in the code below when use questionnaires with different length.
+       
+    $querya = "INSERT INTO order_match (p_id, order_label) VALUES (:p_id, :order_label)";
     $stmt = $pdo->prepare($querya);
     $stmt->execute($data);
-  
-    $queryb = "UPDATE frequency_counter_3 SET n = n + 1 WHERE order_label = ?";
+       
+    $queryb = "UPDATE frequency_counter SET n = n + 1 WHERE order_label = ?";
     $stmt = $pdo->prepare($queryb);
     $stmt->execute([$test]);
-  
+ 
+    $queryc = "INSERT INTO email (p_id, email) VALUES (:p_id, :email)";
+    $stmt = $pdo->prepare($queryc);
+    $stmt->execute($email);
+
+    echo 'success';
+       
 } catch(PDOException $e) {
-    echo $e;
+    http_response_code(500);
+    echo $e -> getMessage();
+};
+?>
+#+end_src
+
+**** postDemo.php
+
+#+begin_src php :tangle :tangle server/www/postDemo.php
+<?php
+require_once(__DIR__ . '/private/dbConnect.php');
+$dbCon = new dbConnect();
+$pdo = $dbCon->getPDO();
+  
+$pdo = $dbCon->getPDO();
+
+$json_string = json_decode(file_get_contents('php://input'), true);
+
+try {    
+    $data = array(
+        ':p_id' => $json_string['p_id'], 
+        ':age' => $json_string['age'],
+        ':gender' => $json_string['gender']
+    );
+
+    $query = "INSERT INTO demo (p_id, age, gender) VALUES (:p_id, :age, :gender)";
+    $stmt = $pdo->prepare($query);
+    $stmt->execute($data);
+
+    echo 'demo post success';
+
+} catch(PDOException $e) {
+    http_response_code(500);
+    echo $e -> getMessage();
 };
 
 ?>
-
 #+end_src
 
-** Frontend
+** Front end
 
 *** index.php
 #+begin_src html :tangle server/www/index.php
