@@ -1,36 +1,16 @@
+#+PROPERTY: :mkdirp yes
+
 * About
 
 Reaction time (RT) for items in psychometric questionnaires reflect participants' immediate mental status during thier response processes. Yet none of the popular data collection platforms allow collecting individual RT for each item. This demo provides an environment to collect such data based on various programming languages (R / JavaScript / PHP / HTML) that interactively work. It also contains randomized and pseudorandomized design strategies to organize the presentation order of a questionnaire in order to explore item effects and sequential effects in psychometric survey.
+
 ** Quick start
 
-*** old version
-Put the lines below in termianl (or command prompt on Windows)
+To download this platform with default setting, put the lines below in termianl (or command prompt on Windows)
 #+begin_src shell :results silent
 git clone https://github.com/Jinghui-Liang/rt_survey_demo.git
 cd rt_survey_demo
-docker-compose up -d --build
 #+end_src
-
-Initialize database / all necessary tables with lines below
-
-#+begin_src shell :results silent
-Rscript R/init_db.R
-Rscript R/init_table.R
-Rscript R/init_trial.R 3
-Rscript R/insertProc.R
-#+end_src
-
-Then put =localhost:8080/index.php= on browser to check if it works. If it works well, run the survey 7 times with different presentation orders (1 fixed order + 3 fully randomized orders + 3 pseudorandomized orders) of the example questionnaire.
-
-Next, you will see "all presentation orders are fully assigned, please run "Rscript reset_counter.R" in terminal to run this survey again" displayed on the screen. If you want to rerun the survey or to enlarge your sample size, turn back to terminal and put:
-
-#+begin_src shell
-Rscript R/reset_counter.R
-#+end_src
-
-and refresh the webpage. It should keep on running.
-
-There must be lots of solution to simplify my code and I'll try to keep on working on it.
 
 *** TODO (new)Launching your platform on server
 
@@ -52,6 +32,12 @@ For Emacs user, use =C-c C-v C-t= to tangle changes with this block. Then call t
 Rscript R/db_conf.R
 #+end_src
 
+Build a docker container as development environment
+
+#+begin_src shell
+docker-compose up -d --build
+#+end_src
+
 For Emacs user, if you are reading this README with org mode, you will find a call function =#+CALL: create-db-conf()= here. Execute it by key binding =C-c C-c= to generate a conf file to make sure that all the ports and names match.
 
 #+CALL: create-db-conf()
@@ -65,8 +51,14 @@ which will ask you the name of database and the length of questionnaire. Also, t
 
 When you see =DONE= displayed on shell and if
 
-1) you are running local test, you can log in to your survey on your browser by =127.0.0.1:8080= or =localhost:8080=. The corresponding database can be accessed by shell command =mysql -h 127.0.0.1 -u root -P 3306 -p=, with password =example=.
+1) you are running local test, you can log in to your survey on your browser by =127.0.0.1:8080= (All users) or =localhost:8080= (MacOS and Linux users only). The corresponding database can be accessed by shell command =mysql -h 127.0.0.1 -u root -P 3306 -p=, with password =example=.
 2) you are about to run this platform online, you can upload the =www= folder to your server (located on =./server/www=) and you are good to go.
+
+When (TODO) *FINISHING* your survey, use the following command line to reset the survey
+
+#+begin_src shell
+Rscript R/reset_counter.R
+#+end_src
 
 * Setting up the server
 
@@ -104,7 +96,7 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_PASS}
 #+end_src
- 
+
 * Initialize database using R
 
 ** One system file to generate the database and tables
@@ -766,18 +758,20 @@ presOrder.then(promiseSuccess, (err) => {
 After all presentation orders are fully assigned, you need to turn back to terminal (or command prompt on Windows) to reset the counter by execute a R script if you want to enlarge the sample
 
 #+begin_src R :tangle R/reset_counter.R 
+qname <- commandArgs (TRUE)
+
+readRenviron(".env")
+
 con <- DBI::dbConnect(
-                RMariaDB::MariaDB(),
-                host = '127.0.0.1',
-                port = '3306',
-                user = 'root',
-                password = 'example',
-                dbname = 'rt_survey_test'
-)
+              RMariaDB::MariaDB(),
+              host = '127.0.0.1',
+              port = Sys.getenv('SQL_PORT'),
+              user = 'root',
+              password = Sys.getenv('DB_PASS'),
+              dbname = qname
+            )
 
-## query <- "update frequency_counter_6 set n = 0"
-
-query <- "update frequency_counter_3 set n = 0"
+query <- "update frequency_counter set n = 0"
 
 rs <- DBI::dbSendStatement (con, query)
 DBI::dbClearResult (rs)
@@ -789,40 +783,37 @@ DBI::dbDisconnect (con)
 ** Checkresponse
 Run the following code in terminal (or command prompt on Windows), type the length of the questionnaire to check the corresponding tables (e.g., if your questionnaire is 6-item long, type =Rscript R/check_response.R 6=). Actually the only table we need to focus is =que_rd_test_n= but it's sometimes useful to see the other record.
 #+begin_src R :tangle R/check_response.R
-arg <- as.numeric (commandArgs (TRUE))
+qname <- commandArgs (TRUE)
 
-re.name <- paste0 ("que_rd_test", arg)
-r.name <- paste0 ("order_list_", arg)
-f.name <- paste0 ("frequency_counter_", arg)
-o.name <- paste0 ("order_match_", arg)
-
-
+readRenviron(".env")
 library(DBI)
 library(tidyverse)
-    
-con <- DBI::dbConnect(
-              RMariaDB::MariaDB(),
-              host = '127.0.0.1',
-              port = '3306',
-              user = 'root',
-              password = 'example',
-              dbname = 'rt_survey_test'
-            )
-    
-response <- tbl (con, re.name) %>%
+
+con_t <- DBI::dbConnect(
+                RMariaDB::MariaDB(),
+                host = '127.0.0.1',
+                port = Sys.getenv('SQL_PORT'),
+                user = 'root',
+                password = Sys.getenv('DB_PASS'),
+                dbname = qname
+              )
+
+
+
+response <- tbl (con_t, "response") %>%
   collect()
 
-frequency <- tbl (con, f.name) %>% 
+frequency <- tbl (con_t, "frequency_counter") %>% 
   collect ()
 
-order <- tbl (con, o.name) %>% 
+order <- tbl (con_t, "order_list") %>% 
   collect ()
 
-match <- tbl (con, m.name) %>%
+match <- tbl (con_t, "order_match") %>%
   collect ()
 
 
-dbDisconnect(con)
+dbDisconnect(con_t)
 head (response)
 head (frequency)
 head (order)

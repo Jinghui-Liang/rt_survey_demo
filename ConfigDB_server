@@ -1,0 +1,19 @@
+#!/usr/bin/env Rscript
+prompt1 <- "Please type the name of your questionnaire (in abbreviative form) "
+prompt2 <- "Please type the length of your questionnaire "
+prompt3 <- "local or server config?"
+cat(prompt1)
+qname <- readLines("stdin", n = 1)
+cat(prompt2)
+qlen <- readLines("stdin", n = 1) |> as.integer()
+cat(prompt3)
+position <- readLines("stdin", n = 1)
+cat ("Arguments accepted, inatialising ......")
+
+if (position == "local") {
+  source ("R/init_db.R")}
+source ("R/init_table.R")
+source ("R/init_trial.R")
+source ("R/insertProc.R")
+
+cat("DONE")
