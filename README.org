@@ -20,6 +20,7 @@ This platform uses =.env= file to setup all connection configuration. The defaul
 HTTP_PORT=8080
 SQL_PORT=3306
 SERVER_NAME=php2
+USR_NAME=root
 DB_NAME=db2
 DB_PASS=example
 MARIADB_VER=10.4
@@ -103,21 +104,34 @@ services:
 
 You might already have corresponding database set up on a server. However if you want to test or modify anything on your local machine, this binary will automatically set up a database.
 
-#+begin_src R :shebang "#!/usr/bin/env Rscript" :tangle-mode (identity #o755) :tangle ConfigDB_server
+#+begin_src R :shebang "#!/usr/bin/env Rscript" :tangle-mode (identity #o755) :tangle ConfigDB
 
-prompt1 <- "Please type the name of your questionnaire (in abbreviative form) "
+prompt1 <- "Are you running local test or uploading your platform to a server? (local/server)"
 prompt2 <- "Please type the length of your questionnaire "
-prompt3 <- "local or server config?"
+
 cat(prompt1)
-qname <- readLines("stdin", n = 1)
+position <- readLines("stdin", n = 1)
+
 cat(prompt2)
 qlen <- readLines("stdin", n = 1) |> as.integer()
-cat(prompt3)
-position <- readLines("stdin", n = 1)
+
 cat ("Arguments accepted, inatialising ......")
 
+readRenviron(".env")
+env_dbname <- Sys.getenv('DB_NAME')
+env_port <- Sys.getenv('SQL_PORT')
+env_password <- Sys.getenv('DB_PASS')
+env_usr <- Sys.getenv('USR_NAME')
+
 if (position == "local") {
-  source ("R/init_db.R")}
+  env_server <- '127.0.0.1'
+  source ("R/init_db.R")
+} else if (position == "server") {
+  env_server <- Sys.getenv ('SERVER_NAME')
+} else {
+  stop ('arguments must be either "local" or "server"')
+}
+
 source ("R/init_table.R")
 source ("R/init_trial.R")
 source ("R/insertProc.R")
@@ -130,22 +144,14 @@ cat("DONE")
 
 If you are testing on your local machine you need to manually set up the database
 #+begin_src R :tangle R/init_db.R
-if (interactive()) {
-  qname <- "test"
-} else {
-  qname <- qname}
-
-readRenviron(".env")
-
 con <- DBI::dbConnect(
               RMariaDB::MariaDB(),
-              host = '127.0.0.1',
-              port = Sys.getenv('SQL_PORT'),
-              user = 'root',
-              password = Sys.getenv('DB_PASS')
-            )
+              host = env_server,
+              port = env_port,
+              user = env_usr,
+              password = env_password)
 
-stmt_db <- paste ('CREATE DATABASE', qname)
+stmt_db <- paste ('CREATE DATABASE', env_dbname)
 
 DBI::dbSendStatement(con, stmt_db)
 
@@ -156,27 +162,14 @@ DBI::dbDisconnect(con)
 
 *** Create table for response data and send it to mysql.
 #+begin_src R :tangle R/init_table.R
-readRenviron(".env")
+con_t <- DBI::dbConnect(
+                RMariaDB::MariaDB(),
+                host = env_server,
+                port = env_port,
+                user = env_usr,
+                password = env_password,
+                dbname = env_dbname)
 
-if (position == "local"){
-  con_t <- DBI::dbConnect(
-                  RMariaDB::MariaDB(),
-                  host = '127.0.0.1',
-                  port = Sys.getenv('SQL_PORT'),
-                  user = 'root',
-                  password = Sys.getenv('DB_PASS'),
-                  dbname = qname ## 'qname' has been defined in 'init_db.R'
-                )
-} else if (position == "server"){
-  con_t <- DBI::dbConnect(
-                  RMariaDB::MariaDB(),
-                  host = Sys.getenv('SERVER_NAME'),
-                  port = Sys.getenv('SQL_PORT'),
-                  ## user = 'tlabusr',
-                  password = Sys.getenv('DB_PASS'),
-                  ## dbname = 'IPIP'
-                )} else {
-                   stop ('arguments must be either "local" or "server"')}
 query <- "CREATE OR REPLACE TABLE response (
       p_id VARCHAR(999), 
       rt VARCHAR(999), 
@@ -303,7 +296,7 @@ DBI::dbDisconnect(con_t)
 
 * Web
 
-** Backend
+** Back end
 
 *** TODO Mariadb config
 
@@ -312,9 +305,9 @@ figure out how to generate dbname from =.env=
 #+begin_src R :results silent :tangle R/db_conf.R
 readRenviron(".env")
 
-template <- "[database]\ndriver = mysql\nhost = %s\nport = %s\ndbname = ipip\nusername = root\npassword = %s"
+template <- "[database]\ndriver = mysql\nhost = %s\nport = %s\ndbname = %s\nusername = root\npassword = %s"
 
-conf <- sprintf(template, Sys.getenv('DB_NAME'), 3306, Sys.getenv('DB_PASS'))
+conf <- sprintf(template, env_server, env_port, env_dbname, env_password)
 
 writeLines(conf, 'server/www/private/conf.ini')
 #+end_src
@@ -783,35 +776,37 @@ DBI::dbDisconnect (con)
 ** Checkresponse
 Run the following code in terminal (or command prompt on Windows), type the length of the questionnaire to check the corresponding tables (e.g., if your questionnaire is 6-item long, type =Rscript R/check_response.R 6=). Actually the only table we need to focus is =que_rd_test_n= but it's sometimes useful to see the other record.
 #+begin_src R :tangle R/check_response.R
-qname <- commandArgs (TRUE)
+prompt_position <- "Are you running local test or uploading your platform to a server? (local/server)"
+prompt_conf <- "Do you want R to read .env file to get data or manually setting the config (only more than 1 survey are conducted)? (env/man)"
+
+cat(prompt_position)
+position <- readLines("stdin", n = 1)
 
 readRenviron(".env")
+
+if (position == "local") {
+  env_server <- '127.0.0.1'
+} else if (position == "server") {
+  env_server <- Sys.getenv ('SERVER_NAME')
+} else {
+  stop ('arguments must be either "local" or "server"')
+}
+
 library(DBI)
 library(tidyverse)
 
 con_t <- DBI::dbConnect(
                 RMariaDB::MariaDB(),
-                host = '127.0.0.1',
+                host = env_server,
                 port = Sys.getenv('SQL_PORT'),
-                user = 'root',
+                user = Sys.getenv('USR_NAME'),
                 password = Sys.getenv('DB_PASS'),
-                dbname = qname
-              )
+                dbname = Sys.getenv('DB_NAME'))
 
-
-
-response <- tbl (con_t, "response") %>%
-  collect()
-
-frequency <- tbl (con_t, "frequency_counter") %>% 
-  collect ()
-
-order <- tbl (con_t, "order_list") %>% 
-  collect ()
-
-match <- tbl (con_t, "order_match") %>%
-  collect ()
-
+response <- tbl (con_t, "response") %>% collect()
+frequency <- tbl (con_t, "frequency_counter") %>% collect ()
+order <- tbl (con_t, "order_list") %>% collect ()
+match <- tbl (con_t, "order_match") %>% collect ()
 
 dbDisconnect(con_t)
 head (response)
