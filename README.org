@@ -2,7 +2,7 @@
 
 Reaction time (RT) for items in psychometric questionnaires reflect participants' immediate mental status during thier response processes. Yet none of the popular data collection platforms allow collecting individual RT for each item. This demo provides an environment to collect such data based on various programming languages (R / JavaScript / PHP / HTML) that interactively work. It also contains randomized and pseudorandomized design strategies to organize the presentation order of a questionnaire in order to explore item effects and sequential effects in psychometric survey.
 
-** Quick start
+* Quick start
 
 To download this platform, put the lines below in termianl (or command prompt on Windows).
 #+begin_src shell :results silent
@@ -61,14 +61,23 @@ This platform will randomly assign a specific presentation order of the questinn
 | 3 | 1 | 2 |
 | 2 | 3 | 1 |
 
-so participants will possibly receive the quesitionnaire with questions displaying following one of orders =2nd, 3rd, 1st=, =1st, 2nd, 3rd=, or =3rd, 1st, 2nd= compared to their original arrangment (quasirandomization design).
+so participants will possibly receive the quesitionnaire with questions displaying following one of orders =2nd, 3rd, 1st=, =1st, 2nd, 3rd=, or =3rd, 1st, 2nd= compared to their original arrangement (counterbalanced design).
 
-Finally, =ConfigDB= will generate fully randomized presentation (fully randomization design)
+Finally, =ConfigDB= will generate a n * n fully randomized presentation order matrix (fully randomized design) and treat each row of this matrix as a presentation order. Again, n means the length of your questionnaire. To sum, for a questionnaire (set) with n items, =ConfigDB= generates 1 fixed order, n counterbalanced orders, and n fully randomized orders. Participants will be assigned with one of them randomly.
 
+Of course, users has full control about how they want the presentation orders are like. To modify the presentation order, please edit =R/generate_order.R= (see below for more details). At this point the script might look a bit complicated, but we will work on that to make it easier to be understood and we will also adding more quasirandomization strategies to organize the presentation order of questionnaires.
+
+** Downloading your data
+
+In this part you are mostly possible to be in a Rstudio or Emacs environment since you might be ready to analysing your data with them. If you want to get the data you collected, open =R/check_response.R= with Rstudio or Emacs and run all lines in it. Table =response= is the survey data, =frequency= records how many times each presentation orders were assigned (to help you make sure if your study is "balanced" enough), =order= records all presentation orders used in your survey. Finally, =match= records which participant (identified by a anonymous reference code) received which presentation order.
 
 ** Extend your survey
 
-When (TODO) *FINISHING* your survey, use the following command line to reset the survey
+The assignment of presentation order is controlled by =server/www/matchOrder.php=. You can keep your survey running without any restriction by editing MySQL queries in it. However, to make sure the balanced design, we set up some rules to avoid a specific order being assigned for too many times. When requirement are met, anyone who log in to the survey URL will see\n
+
+'This survey is closed, thanks for your interest to participate' \n
+
+displayed on the webpage.
 
 #+begin_src shell
 Rscript R/reset_counter.R
