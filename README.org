@@ -1,59 +1,72 @@
-#+PROPERTY: :mkdirp yes
-
 * About
 
 Reaction time (RT) for items in psychometric questionnaires reflect participants' immediate mental status during thier response processes. Yet none of the popular data collection platforms allow collecting individual RT for each item. This demo provides an environment to collect such data based on various programming languages (R / JavaScript / PHP / HTML) that interactively work. It also contains randomized and pseudorandomized design strategies to organize the presentation order of a questionnaire in order to explore item effects and sequential effects in psychometric survey.
 
 ** Quick start
 
-To download this platform with default setting, put the lines below in termianl (or command prompt on Windows)
+To download this platform, put the lines below in termianl (or command prompt on Windows).
 #+begin_src shell :results silent
 git clone https://github.com/Jinghui-Liang/rt_survey_demo.git
 cd rt_survey_demo
 #+end_src
 
-*** TODO (new)Launching your platform on server
+** Using this survey with default settings
 
-This platform uses =.env= file to setup all connection configuration. The default setting is
+This platform uses =.env= file to setup all connection configuration. This config allows you to test everything with your local machine. For Emacs user, use =C-u C-c C-v C-t= to tangle changes *ONLY* with this block. Or you can open =.env= with a editor you like and change the config to the corresponding values, if you want to upload this platform to your server or make any changes.
 
-#+begin_src text :tangle .env
+#+begin_src text :tangle .env :mkdirp yes
 HTTP_PORT=8080
 SQL_PORT=3306
 SERVER_NAME=php2
 USR_NAME=root
-DB_NAME=db2
+DB_NAME=test
 DB_PASS=example
 MARIADB_VER=10.4
 #+end_src
 
-This config allow you to test everything with your local machine. Open =.env= with a editor you like and change the config to the corresponding values you have on the server. 
-For Emacs user, use =C-c C-v C-t= to tangle changes with this block. Then call this R function 
+For Emacs user, if you are reading this README with org mode, you will find a reference call =#+CALL: create-db-conf()= here. Execute it by key binding =C-c C-c= to generate a =conf.ini= file (located in =server/www/private=) to make sure that all the ports and names match.
 
+#+CALL: create-db-conf()
+
+For other users, put the command line below to generate it. The reference call function and this command line do the same thing.
 #+begin_src shell
 Rscript R/db_conf.R
 #+end_src
 
-Build a docker container as development environment
+(*LOCAL TEST ONLY*) At this point, you might want to test any properties about this platform. We use a Docker container to build up a vitural development environment since it relys on minimal dependencies. A default =docker-compose.yaml= file has been written to build a container and you only need to put this command line to make it work.
 
 #+begin_src shell
 docker-compose up -d --build
 #+end_src
 
-For Emacs user, if you are reading this README with org mode, you will find a call function =#+CALL: create-db-conf()= here. Execute it by key binding =C-c C-c= to generate a conf file to make sure that all the ports and names match.
-
-#+CALL: create-db-conf()
-Then execute the binary on shell by
+Once the container is built or your platform is ready to go, execute a prepared binary =ConfigDB= on shell to initialize your database (local test only) and prepare necessary tables. It will ask if this test is run in an online environment or just undergoing test. It also asks you the the length of questionnaire(s) you use (we have a sample questionnaire with 3 item so just put =3= when asked). A full example to have correct input arguments:
 
 #+begin_src shell
 ./ConfigDB
-#+end_src
 
-which will ask you the name of database and the length of questionnaire. Also, this binary asks if this test is about to load server or local config.
+Are you running local test or uploading your platform to a server? (local/server) local
+Please type the length of your questionnaire 3
+#+end_src
 
 When you see =DONE= displayed on shell and if
 
-1) you are running local test, you can log in to your survey on your browser by =127.0.0.1:8080= (All users) or =localhost:8080= (MacOS and Linux users only). The corresponding database can be accessed by shell command =mysql -h 127.0.0.1 -u root -P 3306 -p=, with password =example=.
+1) you are running local test, this binary will generate a database with the same name as =DB_NAME= in your =.env= file. You can log in to your survey on your browser by =127.0.0.1:8080= (all users) or =localhost:8080= (MacOS and Linux users only). The corresponding database can be accessed by shell command =mysql -h 127.0.0.1 -u USR_NAME -P 3306 -p=, with password =DB_PASS= (=USR_NAME= and =DB_PASS= should be the same as you set in =.env= file).
 2) you are about to run this platform online, you can upload the =www= folder to your server (located on =./server/www=) and you are good to go.
+
+** Presentation orders
+
+This platform will randomly assign a specific presentation order of the questinnaire(s) to participants. Bacisally, =ConfigDB= generates a presentation order exactly the same as your original set up (fixed order). To ensure counterbalanced design, it also generates a n * n latin-square (n is the length of the questionnaire) and treats each row as a presentation order. Take a 3-item questionnaire as an example, the generated latin-square will be like:
+
+| 1 | 2 | 3 |
+| 3 | 1 | 2 |
+| 2 | 3 | 1 |
+
+so participants will possibly receive the quesitionnaire with questions displaying following one of orders =2nd, 3rd, 1st=, =1st, 2nd, 3rd=, or =3rd, 1st, 2nd= compared to their original arrangment (quasirandomization design).
+
+Finally, =ConfigDB= will generate fully randomized presentation (fully randomization design)
+
+
+** Extend your survey
 
 When (TODO) *FINISHING* your survey, use the following command line to reset the survey
 
@@ -143,7 +156,7 @@ cat("DONE")
 ** Database
 
 If you are testing on your local machine you need to manually set up the database
-#+begin_src R :tangle R/init_db.R
+#+begin_src R :tangle R/init_db.R :mkdirp yes
 con <- DBI::dbConnect(
               RMariaDB::MariaDB(),
               host = env_server,
@@ -161,7 +174,7 @@ DBI::dbDisconnect(con)
 ** Tables for storing data and recording id-order pairs
 
 *** Create table for response data and send it to mysql.
-#+begin_src R :tangle R/init_table.R
+#+begin_src R :tangle R/init_table.R :mkdirp yes
 con_t <- DBI::dbConnect(
                 RMariaDB::MariaDB(),
                 host = env_server,
@@ -313,7 +326,7 @@ writeLines(conf, 'server/www/private/conf.ini')
 #+end_src
 
 *** PHP connection class
-#+begin_src php :tangle server/www/private/dbConnect.php
+#+begin_src php :tangle server/www/private/dbConnect.php :mkdirp yes
 <?php
 class dbConnect {
     private $pdo = null;
