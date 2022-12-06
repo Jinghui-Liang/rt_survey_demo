@@ -53,6 +53,14 @@ When you see =DONE= displayed on shell and if
 1) you are running local test, this binary will generate a database with the same name as =DB_NAME= in your =.env= file. You can log in to your survey on your browser by =127.0.0.1:8080= (all users) or =localhost:8080= (MacOS and Linux users only). The corresponding database can be accessed by shell command =mysql -h 127.0.0.1 -u USR_NAME -P 3306 -p=, with password =DB_PASS= (=USR_NAME= and =DB_PASS= should be the same as you set in =.env= file).
 2) you are about to run this platform online, you can upload the =www= folder to your server (located on =./server/www=) and you are good to go.
 
+When finishing the test, put this terminal command line:
+
+#+begin_src shell
+docker-compose down
+#+end_src
+
+to shut down the container.
+
 ** Presentation orders
 
 This platform will randomly assign a specific presentation order of the questinnaire(s) to participants. Bacisally, =ConfigDB= generates a presentation order exactly the same as your original set up (fixed order). To ensure counterbalanced design, it also generates a n * n latin-square (n is the length of the questionnaire) and treats each row as a presentation order. Take a 3-item questionnaire as an example, the generated latin-square will be like:
@@ -67,32 +75,89 @@ Finally, =ConfigDB= will generate a n * n fully randomized presentation order ma
 
 Of course, users has full control about how they want the presentation orders are like. To modify the presentation order, please edit =R/generate_order.R= (see below for more details). At this point the script might look a bit complicated, but we will work on that to make it easier to be understood and we will also adding more quasirandomization strategies to organize the presentation order of questionnaires.
 
+** Use your questionnaire
+
+The questionnaire should be written in JavaScript format since we use =jsPsych= to conduct surveys. Below is an example with two questions.
+
+#+begin_src js
+var trials = []; // Questions should be organized in a array based on jsPsych's fashion.
+
+var Q1 = {
+    type: jsPsychSurveyLikert, // Define trial type.
+    questions: [{
+        prompt: "Q1.",
+        labels: ["Strongly Disagree", 
+                 "Disagree", 
+                 "Neutral", 
+                 "Agree", 
+                 "Strongly Agree"]
+    }],
+    preamble: `how you feel like you are a nice person`,
+    data: { Q_num: `01`} // This one is needed since we want to record both trial position and item position.
+a};
+
+trials.push (Q1); // Push this question to the array.
+
+var Q2 = {
+    type: jsPsychSurveyLikert,
+    questions: [{
+        prompt: "Q1.",
+        labels: ["Strongly Disagree", 
+                 "Disagree", 
+                 "Neutral", 
+                 "Agree", 
+                 "Strongly Agree"]
+    }],
+    preamble: `how you feel like you are an bad person`,
+    data: { Q_num: `02`}
+};
+
+trials.push (Q2);
+export {trials}; // Allow this questionnaire to be sourced by other files.
+#+end_src
+
+The questionnaire file should be placed in directory =server/www=. Then open =test_survey.js=, you will see these lines at the top.
+
+#+begin_src js
+import { start, blank, trials, show_data } from './que-3.js';
+#+end_src
+
+Change what is included in the braces if you have different variables defined. Also change =que-3.js= to the filename of your questionnaire. You might also need to run =ConfigDB= again if your questionnaire has different length than the 3-item long example questionnaire (most likely actually).
+
 ** Downloading your data
 
 In this part you are mostly possible to be in a Rstudio or Emacs environment since you might be ready to analysing your data with them. If you want to get the data you collected, open =R/check_response.R= with Rstudio or Emacs and run all lines in it. Table =response= is the survey data, =frequency= records how many times each presentation orders were assigned (to help you make sure if your study is "balanced" enough), =order= records all presentation orders used in your survey. Finally, =match= records which participant (identified by a anonymous reference code) received which presentation order.
 
 ** Extend your survey
 
-The assignment of presentation order is controlled by =server/www/matchOrder.php=. You can keep your survey running without any restriction by editing MySQL queries in it. However, to make sure the balanced design, we set up some rules to avoid a specific order being assigned for too many times. When requirement are met, anyone who log in to the survey URL will see\n
+The assignment of presentation order is controlled by =server/www/matchOrder.php=. You can keep your survey running without any restriction by editing MySQL queries in it. However, to make sure the balanced design, we set up some rules to avoid a specific order being assigned for too many times (described below). These rules and requirements are calculated according to table =frequency_counter= in MySQL database. When requirement are met, anyone who log in to the survey URL will see a message:
 
-'This survey is closed, thanks for your interest to participate' \n
+'This survey is closed, thanks for your interest to participate.' 
 
-displayed on the webpage.
+displayed on the web page. If you want to recruit more participants, you can either modify =matchOrder.php= or run the command line below.
 
 #+begin_src shell
 Rscript R/reset_counter.R
 #+end_src
 
-* Setting up the server
+It will return each value in =frequency_counter= to zero and start the survey again. All collected data won't be affected.
 
-** Dockerfile
+* All configuration
+
+Below is the whole setup about this platform. You might found descriptions in /Create table for recording presentation order in R/ and /test-survey.js/ most useful if you want to change presentation orders or collect more details.
+
+** Setting up the server
+
+
+Since we have =.env= file, docker-compose will read the environment variables automatically.
+*** Dockerfile
 
 #+begin_src text :tangle server.Dockerfile
 FROM php:8.1.1-apache
 RUN docker-php-ext-install mysqli pdo pdo_mysql
 #+end_src
 
-** Docker-compose
+*** Docker-compose
 
 #+begin_src yaml :tangle docker-compose.yml
 version: '3.1'
@@ -120,9 +185,9 @@ services:
       MYSQL_ROOT_PASSWORD: ${DB_PASS}
 #+end_src
 
-* Initialize database using R
+** Initialize database using R
 
-** One system file to generate the database and tables
+*** Binary
 
 You might already have corresponding database set up on a server. However if you want to test or modify anything on your local machine, this binary will automatically set up a database.
 
@@ -162,9 +227,9 @@ cat("DONE")
 
 #+end_src
 
-** Database
+*** Database
 
-If you are testing on your local machine you need to manually set up the database
+If you are testing on your local machine you need to manually set up the database.
 #+begin_src R :tangle R/init_db.R :mkdirp yes
 con <- DBI::dbConnect(
               RMariaDB::MariaDB(),
@@ -180,9 +245,9 @@ DBI::dbSendStatement(con, stmt_db)
 DBI::dbDisconnect(con)
 #+end_src
 
-** Tables for storing data and recording id-order pairs
+*** Tables for storing data and recording id-order pairs
 
-*** Create table for response data and send it to mysql.
+**** Create table for response data and send it to mysql.
 #+begin_src R :tangle R/init_table.R :mkdirp yes
 con_t <- DBI::dbConnect(
                 RMariaDB::MariaDB(),
@@ -207,7 +272,7 @@ query <- "CREATE OR REPLACE TABLE response (
 DBI::dbSendQuery(con_t, query)
 #+end_src
 
-*** Create table for recording presentation order in R.
+**** Create table for recording presentation order in R.
 
 #+begin_src R :results silent :tangle R/generate_order.R
 options (tidyverse.quiet = TRUE)
@@ -260,7 +325,7 @@ match.record <- match.record[-1, ]
 
 #+end_src
   
-*** Send tables to mysql using Terminal (or Common Prompt in Windows)
+**** Send tables to mysql using Terminal (or Common Prompt in Windows)
 
 #+begin_src R :tangle R/init_trial.R
 source ("./generate_order.R")
@@ -291,7 +356,7 @@ DBI::dbClearResult (rs)
 
 #+end_src
 
-** Insert and store procedure (to handle with accepted data) in MySQL
+*** Insert and store procedure (to handle with accepted data) in MySQL
 
 #+begin_src R :tangle R/insertProc.R
 
@@ -316,11 +381,10 @@ DBI::dbDisconnect(con_t)
 
 #+end_src
 
-* Web
+** Web
+*** Back end
 
-** Back end
-
-*** TODO Mariadb config
+**** Mariadb config
 
 figure out how to generate dbname from =.env=
 
@@ -334,23 +398,23 @@ conf <- sprintf(template, env_server, env_port, env_dbname, env_password)
 writeLines(conf, 'server/www/private/conf.ini')
 #+end_src
 
-*** PHP connection class
+**** PHP connection class
 #+begin_src php :tangle server/www/private/dbConnect.php :mkdirp yes
 <?php
 class dbConnect {
     private $pdo = null;
-      
+
     public function getPDO(){
         return $this->pdo;
     }
-      
+
     public function __construct(){
         try {
             $conf = parse_ini_file(__DIR__ . '/conf.ini', true);
             $dsn = sprintf('mysql:host=%s;port=%s;dbname=%s', $conf['database']['host'], $conf['database']['port'], $conf['database']['dbname']);
             $username = $conf['database']['username'];
             $password = $conf['database']['password'];
-      
+
             $this->pdo = new PDO($dsn, $username, $password);
             // set the PDO error mode to exception
             $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -362,18 +426,18 @@ class dbConnect {
 ?>
 #+end_src
 
-*** htaccess
+**** htaccess
 #+begin_src text :tangle server/www/private/.htaccess
 <Location />
 Order deny, allow
 </Location>
 #+end_src  
 
-*** php scripts
+**** php scripts
 
 Rely on fetch API mostly. The code here works but might not be efficient enough (I know...). Please help improving if you are willing to.
 
-**** match_order.php
+***** match_order.php
 
 change =where n<1= in =$query= to set how many times each presentation order is assigned you want.
 #+begin_src php :tangle server/www/match_order.php
@@ -410,7 +474,7 @@ try{
 ?>
 #+end_src
 
-**** postData.php
+***** postData.php
 #+begin_src php :tangle server/www/postData.php
 <?php
 require_once(__DIR__ . '/private/dbConnect.php');
@@ -438,7 +502,7 @@ try{
 };
 #+end_src
 
-**** postMatch.php
+***** postMatch.php
 This is VERY important since it records which participant received which presentation order. The subsquent assignment of orders will rely on this record (which is also my research goal).
 
 #+begin_src php :tangle server/www/postMatch.php
@@ -487,7 +551,7 @@ try {
 ?>
 #+end_src
 
-**** postDemo.php
+***** postDemo.php
 
 #+begin_src php :tangle :tangle server/www/postDemo.php
 <?php
@@ -520,14 +584,13 @@ try {
 ?>
 #+end_src
 
-** Front end
-
-*** index.php
+*** Front end
+**** index.php
 #+begin_src html :tangle server/www/index.php
 <!DOCTYPE html>
 <html>
   <head>
-    <title> Behaviour Survay </title>
+    <title> Your Survey </title>
     <script src="https://unpkg.com/jspsych@7.0.0"></script>
     <script src="https://unpkg.com/@jspsych/plugin-html-button-response@1.0.0"></script>
     <script src="https://unpkg.com/@jspsych/plugin-survey-likert@1.0.0"></script>
@@ -549,81 +612,84 @@ try {
 
 #+end_src
 
-*** que-3.js
+**** que-3.js
 A short questionnaire with 3 items just for testing.
-In formal survey you can add parameter =required: TRUE= right after =labels: likert= to force participants to answer the question displayed.
+In formal survey you can add parameter =required: TRUE= right after =labels: likert= to create must-answer questions.
 #+begin_src js :tangle server/www/que-3.js
-  // When specifying the Q-num, use strings "01" to "09" to match the presentation order.
+// When specifying the Q-num, use strings "01" to "09" to match the presentation order.
 
-  var instru = `how you feel like you are a...`;
-  var likert = ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"];
-  var trials = [];
+var instru = `how you feel like you are a...`;
+var likert = ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"];
+var trials = [];
 
-  var start = {
-      type: jsPsychHtmlButtonResponse,
-      stimulus: '<p>Welcome to this behaviour survey, please press "start" to continue</p>',
-      choices: [`Start`],
-      data: { Q_num: `start` }
-  };
+var start = {
+    type: jsPsychHtmlButtonResponse,
+    stimulus: '<p>Welcome to this behaviour survey, please press "start" to continue</p>',
+    choices: [`Start`],
+    data: { Q_num: `start` }
+};
 
-  var blank = {
-      type: jsPsychHtmlButtonResponse,
-      stimulus: 'Press "Start" again to begin the survey',
-      choices: [`Start`],
-      data: { Q_num: 0 }
-  };
+var blank = {
+    type: jsPsychHtmlButtonResponse,
+    stimulus: 'Press "Start" again to begin the survey',
+    choices: [`Start`],
+    data: { Q_num: 0 }
+};
 
-  var show_data = {
-      type: jsPsychHtmlButtonResponse,
-      stimulus: `that's the end of this survey,thanks for your participation.`,
-      choices: ['Show results'],
-      data: { Q_num: `drop` }
-  };
+var show_data = {
+    type: jsPsychHtmlButtonResponse,
+    stimulus: `that's the end of this survey,thanks for your participation.`,
+    choices: ['Show results'],
+    data: { Q_num: `drop` }
+};
 
-  var Q1 = {
-      type: jsPsychSurveyLikert,
-      questions: [{
-    prompt: "Q1.",
-    labels: likert
-      }],
-      preamble: instru,
-      data: { Q_num: `01`}
-  };
+var Q1 = {
+    type: jsPsychSurveyLikert,
+    questions: [{
+        prompt: "Q1.",
+        labels: likert
+    }],
+    preamble: instru,
+    data: { Q_num: `01`}
+};
 
-  trials.push (Q1);
+trials.push (Q1);
 
-  var Q2 = {
-      type: jsPsychSurveyLikert,
-      questions: [{
-    prompt: "Q2.",
-    labels: likert
-      }],
-      preamble: instru,
-      data: { Q_num: `02`}
-  };
+var Q2 = {
+    type: jsPsychSurveyLikert,
+    questions: [{
+        prompt: "Q2.",
+        labels: likert
+    }],
+    preamble: instru,
+    data: { Q_num: `02`}
+};
 
-  trials.push (Q2);
+trials.push (Q2);
 
-  var Q3 = {
-      type: jsPsychSurveyLikert,
-      questions: [{
-    prompt: "Q3.",
-    labels: likert
-      }],
-      preamble: instru,
-      data: { Q_num: `03`}
-  };
+var Q3 = {
+    type: jsPsychSurveyLikert,
+    questions: [{
+        prompt: "Q3.",
+        labels: likert
+    }],
+    preamble: instru,
+    data: { Q_num: `03`}
+};
 
-  trials.push (Q3);
+trials.push (Q3);
 
-  export { start, blank, trials, show_data };
+export { start, blank, trials, show_data };
 
 #+end_src
 
-*** test-survey.js
+**** test-survey.js
 
 Since I used =async= funtion to assign presist presentation orders, the whole survey and related customized functions are needed to be wrapped into the resolve callback function.
 #+begin_src js :tangle server/www/test-survey.js
+// --------- Setting up questionnaire. -------------
+import { start, blank, trials, show_data } from './que-3.js';
+console.log (trials);
 
 // ------- Functions to set up database connection ----------
 
@@ -650,114 +716,109 @@ const getOrder = async () => {
     return data;
 };
 
-// --------- Setting up questionnaire. -------------
-// import { start, blank, trials, show_data } from './que-6.js';
-import { start, blank, trials, show_data } from './que-3.js';
-console.log (trials);
 // --------- Initializing jsPsych and posting response to database ----------
 
 const postData = async (data, uri) => {
     const settings_post = {
-	method: 'POST',
-	headers: {
-	    Accept: 'application/json',
-	    'Content-Type': 'application/json'
-	},
-	body: JSON.stringify(data)
+	      method: 'POST',
+	      headers: {
+	          Accept: 'application/json',
+	          'Content-Type': 'application/json'
+	      },
+	      body: JSON.stringify(data)
     };
     try {
-	const fetchResponse = await fetch(uri, settings_post);
-	const data = await fetchResponse.json();
-	console.log (data);
-	return data;
+	      const fetchResponse = await fetch(uri, settings_post);
+	      const data = await fetchResponse.json();
+	      console.log (data);
+	      return data;
     } catch (e) {
-	console.log(e);
+	      console.log(e);
     }
 };
 
 let promiseSuccess = (data) => {
     if (data.length == 0) {
-	document.write ('all presentation orders are fully assigned, please run "Rscript reset_counter.R" in terminal to run this survey again');
-	throw 'all presentation orders are fully assigned, please run "Rscript reset_counter.R" in terminal to run this survey again';
+	      document.write ('all presentation orders are fully assigned, please run "Rscript reset_counter.R" in terminal to run this survey again');
+	      throw 'all presentation orders are fully assigned, please run "Rscript reset_counter.R" in terminal to run this survey again';
     } else {
-    var order_label = Object.values (data[0]);
-    let order = order_label.slice (1, order_label.length).map (x => x + 1);
-    
-    if (order.length < 10) {
-	var order_str = order.map (i => "0" + i);
-    } else {
-	for (j; j <= order.length - 1; j++) {
-	    let element = order[j];
-	    if (element.length == 1) {
-		temp = "0" + element;
-		order_str.push (temp);
-	    } else {
-		order_str.push (order[j]);
-	    }
-	}
-    };
+        var order_label = Object.values (data[0]);
+        let order = order_label.slice (1, order_label.length).map (x => x + 1);
+        if (order.length < 10) {
+	          var order_str = order.map (i => "0" + i);
+        } else {
+	          for (j; j <= order.length - 1; j++) {
+	              let element = order[j];
+	              if (element.length == 1) {
+		                temp = "0" + element;
+		                order_str.push (temp);
+	              } else {
+		                order_str.push (order[j]);
+	              }
+	          }
+        };
     };
 
-// use async function to get presentation order from mysql
-    
-var jsPsych = initJsPsych({
-    on_finish: function () {
-	var p_id = jsPsych.randomization.randomID(4);
-	jsPsych.data.addProperties({order_index: method,
-				    p_id: p_id});
-	var match = {
-	    p_id: p_id,
-	    order_label: method
-	};
-	console.log (match);
-	let json = jsPsych.data.get()
-	    .filterCustom(trial => trial.trial_type == 'survey-likert')
-	    .ignore('question_order');
-	let json_trials = json.trials.map(x => {
-	    let question = Object.keys(x.response)[0];
-	    let response = x.response[question];
-	    return ({
-		p_id: x.p_id,
-		rt: x.rt,
-		response: x.response,
-		Q_num: x.Q_num,
-		trial_type: x.trial_type,
-		trial_index: x.trial_index,
-		order_index: x.order_index,
-		time_elapsed: x.time_elapsed,
-		internal_node_id: x.internal_node_id
-	    })
-	});
-	document.write (json_trials[0]);
-	console.log (json_trials[0]);
-	let trial_data = {
-	    json_trials: json_trials,
-	    proc_method: 'insertLikertResp'
-	};
-	postData (match, 'postMatch.php');
-	postData (trial_data, 'postData.php');
-	console.log(JSON.stringify(trial_data));
-    }
-});
+    // use async function to get presentation order from mysql
 
-// ----------- Reorganize questions based on the given order. -------------
-    
-    var new_order = []; 
+    var jsPsych = initJsPsych({
+        on_finish: function () {
+	          var p_id = jsPsych.randomization.randomID(4);
+	          jsPsych.data.addProperties({order_index: method,
+				                                p_id: p_id});
+	          var match = {
+	              p_id: p_id,
+	              order_label: method
+	          };
+	          console.log (match);
+	          let json = jsPsych.data.get()
+	              .filterCustom(trial => trial.trial_type == 'survey-likert')
+	              .ignore('question_order');
+	          let json_trials = json.trials.map(x => {
+	              let question = Object.keys(x.response)[0];
+	              let response = x.response[question];
+	              return ({
+		                p_id: x.p_id,
+		                rt: x.rt,
+		                response: x.response,
+		                Q_num: x.Q_num,
+		                trial_type: x.trial_type,
+		                trial_index: x.trial_index,
+		                order_index: x.order_index,
+		                time_elapsed: x.time_elapsed,
+		                internal_node_id: x.internal_node_id
+	              })
+	          });
+	          document.write (json_trials[0]);
+	          console.log (json_trials[0]);
+	          let trial_data = {
+	              json_trials: json_trials,
+	              proc_method: 'insertLikertResp'
+	          };
+	          postData (match, 'postMatch.php');
+	          postData (trial_data, 'postData.php');
+	          console.log(JSON.stringify(trial_data));
+        }
+    });
+
+    // ----------- Reorganize questions based on the given order. -------------
+
+    var new_order = [];
     var v = 0;
     var id = 0;
     console.log (trials[id].data);
     for (v; v < order_str.length; v++) {
-	while (trials[id].data.Q_num != order_str[v]) {
-	    id++;;
-	}
-	new_order.push (trials[id]);
-	id = 0; // repeatly matching.
+	      while (trials[id].data.Q_num != order_str[v]) {
+	          id++;;
+	      }
+	      new_order.push (trials[id]);
+	      id = 0; // repeatly matching.
     };
     console.log (order_label);
     console.log (new_order);
     var method = order_label [0];
     var fin_order = {timeline: new_order};
-    jsPsych.run([start, blank, fin_order, show_data]); 
+    jsPsych.run([start, blank, fin_order, show_data]);
 };
 
 var presOrder = getOrder();
@@ -765,10 +826,9 @@ var presOrder = getOrder();
 presOrder.then(promiseSuccess, (err) => {
     console.log(error);
 });
-
 #+end_src
 
-*** Reset the frequenct counter using R
+**** Reset the frequenct counter using R
 
 After all presentation orders are fully assigned, you need to turn back to terminal (or command prompt on Windows) to reset the counter by execute a R script if you want to enlarge the sample
 
@@ -793,9 +853,9 @@ DBI::dbClearResult (rs)
 DBI::dbDisconnect (con)
 #+end_src
 
-* Analysis
+** Analysis
 
-** Checkresponse
+*** Checkresponse
 Run the following code in terminal (or command prompt on Windows), type the length of the questionnaire to check the corresponding tables (e.g., if your questionnaire is 6-item long, type =Rscript R/check_response.R 6=). Actually the only table we need to focus is =que_rd_test_n= but it's sometimes useful to see the other record.
 #+begin_src R :tangle R/check_response.R
 prompt_position <- "Are you running local test or uploading your platform to a server? (local/server)"
