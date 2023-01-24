@@ -18,4 +18,7 @@ query <- "CREATE OR REPLACE TABLE response (
       internal_node_id VARCHAR(999)
       )"
 
-DBI::dbSendQuery(con_t, query)
+rs <- DBI::dbSendQuery(con_t, query)
+DBI::dbClearResult (rs)
+
+cat ("response table generated successfully")

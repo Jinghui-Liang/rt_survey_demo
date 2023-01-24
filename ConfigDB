@@ -28,5 +28,6 @@ if (position == "local") {
 source ("R/init_table.R")
 source ("R/init_trial.R")
 source ("R/insertProc.R")
+source ("R/db_conf.R")
 
 cat("DONE")

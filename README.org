@@ -1,3 +1,6 @@
+
+*TODO* Check =db_conf.R=, explain "host" <- "dbname" <- =env_dbname=
+
 * About
 
 Reaction time (RT) for items in psychometric questionnaires reflect participants' immediate mental status during thier response processes. Yet none of the popular data collection platforms allow collecting individual RT for each item. This demo provides an environment to collect such data based on various programming languages (R / JavaScript / PHP / HTML) that interactively work. It also contains randomized and pseudorandomized design strategies to organize the presentation order of a questionnaire in order to explore item effects and sequential effects in psychometric survey.
@@ -222,6 +225,7 @@ if (position == "local") {
 source ("R/init_table.R")
 source ("R/init_trial.R")
 source ("R/insertProc.R")
+source ("R/db_conf.R")
 
 cat("DONE")
 
@@ -243,6 +247,12 @@ stmt_db <- paste ('CREATE DATABASE', env_dbname)
 DBI::dbSendStatement(con, stmt_db)
 
 DBI::dbDisconnect(con)
+
+cat ("database generated successfully")
+cat (env_server)
+cat (env_port)
+cat (env_usr)
+cat (env_password)
 #+end_src
 
 *** Tables for storing data and recording id-order pairs
@@ -269,12 +279,16 @@ query <- "CREATE OR REPLACE TABLE response (
       internal_node_id VARCHAR(999)
       )"
 
-DBI::dbSendQuery(con_t, query)
+rs <- DBI::dbSendQuery(con_t, query)
+DBI::dbClearResult (rs)
+
+cat ("response table generated successfully")
 #+end_src
 
 **** Create table for recording presentation order in R.
 
 #+begin_src R :results silent :tangle R/generate_order.R
+cat ("generate_order.R read")
 options (tidyverse.quiet = TRUE)
 library (tidyverse)
 set.seed (666) ## since it would be sourced by other scripts it should be reproducible.
@@ -324,11 +338,11 @@ match.record <- tibble (p_id = "0",
 match.record <- match.record[-1, ]
 
 #+end_src
-  
+
 **** Send tables to mysql using Terminal (or Common Prompt in Windows)
 
 #+begin_src R :tangle R/init_trial.R
-source ("./generate_order.R")
+source ("R/generate_order.R")
 
 DBI::dbWriteTable (con_t, "order_list", o.record, overwrite = TRUE)
 DBI::dbWriteTable (con_t, "frequency_counter", f.record, overwrite = TRUE)
@@ -393,7 +407,7 @@ readRenviron(".env")
 
 template <- "[database]\ndriver = mysql\nhost = %s\nport = %s\ndbname = %s\nusername = root\npassword = %s"
 
-conf <- sprintf(template, env_server, env_port, env_dbname, env_password)
+conf <- sprintf(template, env_dbname, env_port, env_dbname, env_password)
 
 writeLines(conf, 'server/www/private/conf.ini')
 #+end_src

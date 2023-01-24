@@ -1,3 +1,4 @@
+cat ("generate_order.R read")
 options (tidyverse.quiet = TRUE)
 library (tidyverse)
 set.seed (666) ## since it would be sourced by other scripts it should be reproducible.

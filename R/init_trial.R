@@ -1,4 +1,4 @@
-source ("./generate_order.R")
+source ("R/generate_order.R")
 
 DBI::dbWriteTable (con_t, "order_list", o.record, overwrite = TRUE)
 DBI::dbWriteTable (con_t, "frequency_counter", f.record, overwrite = TRUE)

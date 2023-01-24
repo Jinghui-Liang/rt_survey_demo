@@ -10,3 +10,9 @@ stmt_db <- paste ('CREATE DATABASE', env_dbname)
 DBI::dbSendStatement(con, stmt_db)
 
 DBI::dbDisconnect(con)
+
+cat ("database generated successfully")
+cat (env_server)
+cat (env_port)
+cat (env_usr)
+cat (env_password)
