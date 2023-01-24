@@ -18,6 +18,7 @@ env_usr <- Sys.getenv('USR_NAME')
 
 if (position == "local") {
   env_server <- '127.0.0.1'
+  env_port <- '3306'
   source ("R/init_db.R")
 } else if (position == "server") {
   env_server <- Sys.getenv ('SERVER_NAME')

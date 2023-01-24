@@ -1,6 +1,6 @@
 // When specifying the Q-num, use strings "01" to "09" to match the presentation order.
 
-var instru = `how you feel like you are a...`;
+// var instru = `how you feel like you are a...`;
 var likert = ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"];
 var trials = [];
 
@@ -28,10 +28,10 @@ var show_data = {
 var Q1 = {
     type: jsPsychSurveyLikert,
     questions: [{
-        prompt: "Q1.",
+        prompt: "I like vegatables.",
         labels: likert
     }],
-    preamble: instru,
+    // preamble: instru,
     data: { Q_num: `01`}
 };
 
@@ -40,10 +40,10 @@ trials.push (Q1);
 var Q2 = {
     type: jsPsychSurveyLikert,
     questions: [{
-        prompt: "Q2.",
+        prompt: "I like cats",
         labels: likert
     }],
-    preamble: instru,
+    // preamble: instru,
     data: { Q_num: `02`}
 };
 
@@ -52,10 +52,10 @@ trials.push (Q2);
 var Q3 = {
     type: jsPsychSurveyLikert,
     questions: [{
-        prompt: "Q3.",
+        prompt: "I like dogs",
         labels: likert
     }],
-    preamble: instru,
+    // preamble: instru,
     data: { Q_num: `03`}
 };
 

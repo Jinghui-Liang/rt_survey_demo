@@ -27,15 +27,6 @@ DB_PASS=example
 MARIADB_VER=10.4
 #+end_src
 
-For Emacs user, if you are reading this README with org mode, you will find a reference call =#+CALL: create-db-conf()= here. Execute it by key binding =C-c C-c= to generate a =conf.ini= file (located in =server/www/private=) to make sure that all the ports and names match.
-
-#+CALL: create-db-conf()
-
-For other users, put the command line below to generate it. The reference call function and this command line do the same thing.
-#+begin_src shell
-Rscript R/db_conf.R
-#+end_src
-
 (*LOCAL TEST ONLY*) At this point, you might want to test any properties about this platform. We use a Docker container to build up a vitural development environment since it relys on minimal dependencies. A default =docker-compose.yaml= file has been written to build a container and you only need to put this command line to make it work.
 
 #+begin_src shell
@@ -215,6 +206,7 @@ env_usr <- Sys.getenv('USR_NAME')
 
 if (position == "local") {
   env_server <- '127.0.0.1'
+  env_port <- '3306'
   source ("R/init_db.R")
 } else if (position == "server") {
   env_server <- Sys.getenv ('SERVER_NAME')
@@ -632,7 +624,7 @@ In formal survey you can add parameter =required: TRUE= right after =labels: lik
 #+begin_src js :tangle server/www/que-3.js
 // When specifying the Q-num, use strings "01" to "09" to match the presentation order.
 
-var instru = `how you feel like you are a...`;
+// var instru = `how you feel like you are a...`;
 var likert = ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"];
 var trials = [];
 
@@ -660,10 +652,10 @@ var show_data = {
 var Q1 = {
     type: jsPsychSurveyLikert,
     questions: [{
-        prompt: "Q1.",
+        prompt: "I like vegatables.",
         labels: likert
     }],
-    preamble: instru,
+    // preamble: instru,
     data: { Q_num: `01`}
 };
 
@@ -672,10 +664,10 @@ trials.push (Q1);
 var Q2 = {
     type: jsPsychSurveyLikert,
     questions: [{
-        prompt: "Q2.",
+        prompt: "I like cats",
         labels: likert
     }],
-    preamble: instru,
+    // preamble: instru,
     data: { Q_num: `02`}
 };
 
@@ -684,10 +676,10 @@ trials.push (Q2);
 var Q3 = {
     type: jsPsychSurveyLikert,
     questions: [{
-        prompt: "Q3.",
+        prompt: "I like dogs",
         labels: likert
     }],
-    preamble: instru,
+    // preamble: instru,
     data: { Q_num: `03`}
 };
 
