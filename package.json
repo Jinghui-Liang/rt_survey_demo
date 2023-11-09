@@ -1,0 +1,20 @@
+{
+  "type": "module",
+  "name": "rt_survey_demo",
+  "version": "1.0.0",
+  "description": "*TODO* Check =db_conf.R=, explain \"host\" <- \"dbname\" <- =env_dbname=",
+  "main": "index.php",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Jinghui-Liang/rt_survey_demo.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Jinghui-Liang/rt_survey_demo/issues"
+  },
+  "homepage": "https://github.com/Jinghui-Liang/rt_survey_demo#readme"
+}

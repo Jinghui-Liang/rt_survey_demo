@@ -1,26 +1,37 @@
 #!/usr/bin/env Rscript
-prompt1 <- "Are you running local test or uploading your platform to a server? (local/server)"
-prompt2 <- "Please type the length of your questionnaire "
+prompt1 <- "Are you running local test or uploading your platform to a server? (local/server) "
+prompt2 <- "The name of target questionnaire you would like to use, extension required: "
 
 cat(prompt1)
 position <- readLines("stdin", n = 1)
 
-cat(prompt2)
-qlen <- readLines("stdin", n = 1) |> as.integer()
+cat (prompt2)
+quest_name <- readLines("stdin", n = 1)
 
-cat ("Arguments accepted, inatialising ......")
+tryCatch (source ("R/make_scale.R"),
+          error = getwd())
+
+cat ("Questionnaire has parsed and saved to `www` \n")
+
+qlen <- nrow (dat)
+cat ("Reading evnironment configuration... \n")
 
 readRenviron(".env")
-env_dbname <- Sys.getenv('DB_NAME')
+
 env_port <- Sys.getenv('SQL_PORT')
 env_password <- Sys.getenv('DB_PASS')
 env_usr <- Sys.getenv('USR_NAME')
+env_quest <- quest_name
+
+cat ("Arguments accepted, inatialising ...... \n")
 
 if (position == "local") {
+  env_dbname <- tools::file_path_sans_ext (quest_name)
   env_server <- '127.0.0.1'
   env_port <- '3306'
   source ("R/init_db.R")
 } else if (position == "server") {
+  env_dbname <- Sys.getenv('DB_NAME')
   env_server <- Sys.getenv ('SERVER_NAME')
 } else {
   stop ('arguments must be either "local" or "server"')
@@ -31,4 +42,4 @@ source ("R/init_trial.R")
 source ("R/insertProc.R")
 source ("R/db_conf.R")
 
-cat("DONE")
+cat("Initialization done")

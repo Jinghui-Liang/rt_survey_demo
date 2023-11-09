@@ -1,5 +1,5 @@
 
-*TODO* Check =db_conf.R=, explain "host" <- "dbname" <- =env_dbname=
+* *TODO* Check =db_conf.R=, explain "host" <- "dbname" <- =env_dbname=
 
 * About
 
@@ -27,13 +27,13 @@ DB_PASS=example
 MARIADB_VER=10.4
 #+end_src
 
-(*LOCAL TEST ONLY*) At this point, you might want to test any properties about this platform. We use a Docker container to build up a vitural development environment since it relys on minimal dependencies. A default =docker-compose.yaml= file has been written to build a container and you only need to put this command line to make it work.
+(*LOCAL TEST ONLY*) At this point, you might want to test any properties about this platform. We use a Docker container to build up a vital development environment since it relys on minimal dependencies. A default =docker-compose.yaml= file has been written to build a container and you only need to put this command line to make it work.
 
 #+begin_src shell
 docker-compose up -d --build
 #+end_src
 
-Once the container is built or your platform is ready to go, execute a prepared binary =ConfigDB= on shell to initialize your database (local test only) and prepare necessary tables. It will ask if this test is run in an online environment or just undergoing test. It also asks you the the length of questionnaire(s) you use (we have a sample questionnaire with 3 item so just put =3= when asked). A full example to have correct input arguments:
+Once the container is built or your platform is ready to go, execute a prepared binary =ConfigDB= on shell to initialize your database (local test only) and prepare necessary tables. It will ask if this test is run in an online environment or just undergoing test. It also asks you the the length of questionnaire(s) you use (we have a sample questionnaire with 3 item so just put =3= when being asked). A full example to have correct input arguments:
 
 #+begin_src shell
 ./ConfigDB
@@ -45,7 +45,6 @@ Please type the length of your questionnaire 3
 When you see =DONE= displayed on shell and if
 
 1) you are running local test, this binary will generate a database with the same name as =DB_NAME= in your =.env= file. You can log in to your survey on your browser by =127.0.0.1:8080= (all users) or =localhost:8080= (MacOS and Linux users only). The corresponding database can be accessed by shell command =mysql -h 127.0.0.1 -u USR_NAME -P 3306 -p=, with password =DB_PASS= (=USR_NAME= and =DB_PASS= should be the same as you set in =.env= file).
-2) you are about to run this platform online, you can upload the =www= folder to your server (located on =./server/www=) and you are good to go.
 
 When finishing the test, put this terminal command line:
 
@@ -53,7 +52,9 @@ When finishing the test, put this terminal command line:
 docker-compose down
 #+end_src
 
-to shut down the container.
+to turn off the container; or
+
+2) you are about to run this platform online, you can upload the =www= folder to your server (located on =./server/www=) and you are good to go.
 
 ** Presentation orders
 
@@ -69,7 +70,15 @@ Finally, =ConfigDB= will generate a n * n fully randomized presentation order ma
 
 Of course, users has full control about how they want the presentation orders are like. To modify the presentation order, please edit =R/generate_order.R= (see below for more details). At this point the script might look a bit complicated, but we will work on that to make it easier to be understood and we will also adding more quasirandomization strategies to organize the presentation order of questionnaires.
 
-** Use your questionnaire
+** TODO Use your questionnaire
+
+*We have a new method to easily handle with your questionnaire, no programming techniques needed with default settings!*
+
+*** *THE NEW WAY* (recommended)
+
+Prepare your questionnaire in =.csv= format, with one question each cell. Then you upload with this file to the =./server/www= directory.
+
+*** The old way
 
 The questionnaire should be written in JavaScript format since we use =jsPsych= to conduct surveys. Below is an example with two questions.
 
@@ -142,7 +151,6 @@ Below is the whole setup about this platform. You might found descriptions in /C
 
 ** Setting up the server
 
-
 Since we have =.env= file, docker-compose will read the environment variables automatically.
 *** Dockerfile
 
@@ -179,36 +187,46 @@ services:
       MYSQL_ROOT_PASSWORD: ${DB_PASS}
 #+end_src
 
-** Initialize database using R
-
+** Initialize database
 *** Binary
 
 You might already have corresponding database set up on a server. However if you want to test or modify anything on your local machine, this binary will automatically set up a database.
 
 #+begin_src R :shebang "#!/usr/bin/env Rscript" :tangle-mode (identity #o755) :tangle ConfigDB
 
-prompt1 <- "Are you running local test or uploading your platform to a server? (local/server)"
-prompt2 <- "Please type the length of your questionnaire "
+prompt1 <- "Are you running local test or uploading your platform to a server? (local/server) "
+prompt2 <- "The name of target questionnaire you would like to use, extension required: "
 
 cat(prompt1)
 position <- readLines("stdin", n = 1)
 
-cat(prompt2)
-qlen <- readLines("stdin", n = 1) |> as.integer()
+cat (prompt2)
+quest_name <- readLines("stdin", n = 1)
 
-cat ("Arguments accepted, inatialising ......")
+tryCatch (source ("R/make_scale.R"),
+          error = getwd())
+
+cat ("Questionnaire has parsed and saved to `www` \n")
+
+qlen <- nrow (dat)
+cat ("Reading evnironment configuration... \n")
 
 readRenviron(".env")
-env_dbname <- Sys.getenv('DB_NAME')
+
 env_port <- Sys.getenv('SQL_PORT')
 env_password <- Sys.getenv('DB_PASS')
 env_usr <- Sys.getenv('USR_NAME')
+env_quest <- quest_name
+
+cat ("Arguments accepted, inatialising ...... \n")
 
 if (position == "local") {
+  env_dbname <- tools::file_path_sans_ext (quest_name)
   env_server <- '127.0.0.1'
   env_port <- '3306'
   source ("R/init_db.R")
 } else if (position == "server") {
+  env_dbname <- Sys.getenv('DB_NAME')
   env_server <- Sys.getenv ('SERVER_NAME')
 } else {
   stop ('arguments must be either "local" or "server"')
@@ -219,8 +237,24 @@ source ("R/init_trial.R")
 source ("R/insertProc.R")
 source ("R/db_conf.R")
 
-cat("DONE")
+cat("Initialization done")
 
+#+end_src
+
+*** R Scale generator
+
+#+begin_src R :tangle ./R/make_scale.R
+
+if (!interactive()) {
+  dat <- data.frame (read.csv (paste0 ("./scalepool/", quest_name),
+    header = FALSE))
+  } else {
+  dat <- data.frame (read.csv ('./scalepool/test-scale.csv', header = FALSE))
+}
+
+names(dat)[1] <- "prompt"
+scaleJSON <- jsonlite::toJSON (dat, pretty = TRUE)
+write(scaleJSON, "./server/www/scale.json")
 #+end_src
 
 *** Database
@@ -236,15 +270,11 @@ con <- DBI::dbConnect(
 
 stmt_db <- paste ('CREATE DATABASE', env_dbname)
 
-DBI::dbSendStatement(con, stmt_db)
-
+rs <- DBI::dbSendStatement(con, stmt_db)
+DBI::dbClearResult (rs)
 DBI::dbDisconnect(con)
 
 cat ("database generated successfully")
-cat (env_server)
-cat (env_port)
-cat (env_usr)
-cat (env_password)
 #+end_src
 
 *** Tables for storing data and recording id-order pairs
@@ -392,14 +422,9 @@ DBI::dbDisconnect(con_t)
 
 **** Mariadb config
 
-figure out how to generate dbname from =.env=
-
 #+begin_src R :results silent :tangle R/db_conf.R
-readRenviron(".env")
-
-template <- "[database]\ndriver = mysql\nhost = %s\nport = %s\ndbname = %s\nusername = root\npassword = %s"
-
-conf <- sprintf(template, env_dbname, env_port, env_dbname, env_password)
+template <- "[database]\ndriver = mysql\nhost = %s\nport = %s\ndbname = %s\nusername = %s\npassword = %s"
+conf <- sprintf(template, "test", env_port, env_dbname, env_usr, env_password)
 
 writeLines(conf, 'server/www/private/conf.ini')
 #+end_src
@@ -480,34 +505,6 @@ try{
 ?>
 #+end_src
 
-***** postData.php
-#+begin_src php :tangle server/www/postData.php
-<?php
-require_once(__DIR__ . '/private/dbConnect.php');
-$dbCon = new dbConnect();
-$pdo = $dbCon->getPDO();
-
-$json_string = json_decode(file_get_contents('php://input'), true);
-       
-try{
-
-    $sql_proc = 'CALL ' . $json_string['proc_method'] . '(?)';
-
-    $sth = $pdo->prepare($sql_proc);
-
-    foreach ($json_string['json_trials'] as $x) {
-        $sth->bindValue(1, json_encode($x), PDO::PARAM_STR);
-        $sth->execute();
-    };
-
-    echo 'success';
-
-}catch(PDOException $e){
-    http_response_code(500);
-    echo $e -> getMessage();
-};
-#+end_src
-
 ***** postMatch.php
 This is VERY important since it records which participant received which presentation order. The subsquent assignment of orders will rely on this record (which is also my research goal).
 
@@ -557,6 +554,34 @@ try {
 ?>
 #+end_src
 
+***** postData.php
+#+begin_src php :tangle server/www/postData.php
+<?php
+require_once(__DIR__ . '/private/dbConnect.php');
+$dbCon = new dbConnect();
+$pdo = $dbCon->getPDO();
+
+$json_string = json_decode(file_get_contents('php://input'), true);
+       
+try{
+
+    $sql_proc = 'CALL ' . $json_string['proc_method'] . '(?)';
+
+    $sth = $pdo->prepare($sql_proc);
+
+    foreach ($json_string['json_trials'] as $x) {
+        $sth->bindValue(1, json_encode($x), PDO::PARAM_STR);
+        $sth->execute();
+    };
+
+    echo 'success';
+
+}catch(PDOException $e){
+    http_response_code(500);
+    echo $e -> getMessage();
+};
+#+end_src
+
 ***** postDemo.php
 
 #+begin_src php :tangle :tangle server/www/postDemo.php
@@ -600,6 +625,7 @@ try {
     <script src="https://unpkg.com/jspsych@7.0.0"></script>
     <script src="https://unpkg.com/@jspsych/plugin-html-button-response@1.0.0"></script>
     <script src="https://unpkg.com/@jspsych/plugin-survey-likert@1.0.0"></script>
+
     <style>
       .jspsych-btn {
       margin-bottom: 10px;
@@ -613,16 +639,55 @@ try {
   </head>
   <body></body>
   <!-- use module.js to connect js scripts. -->
-  <script type = "module" src= "test-survey.js"> </script>
+  <script type= "module" src= "./runSurvey.js"> </script>
 </html>
 
 #+end_src
 
-**** que-3.js
+**** Generate jsPsych format questions
+
+the execution of this piece generates a .js file including all questions within your .csv file, following `jsPsych`'s manner.
 A short questionnaire with 3 items just for testing.
 In formal survey you can add parameter =required: TRUE= right after =labels: likert= to create must-answer questions.
-#+begin_src js :tangle server/www/que-3.js
-// When specifying the Q-num, use strings "01" to "09" to match the presentation order.
+#+begin_src js :tangle server/www/jsscalegen.js
+
+const getScale = async(uri) => {
+    const output = await fetch (uri)
+          .then (response => response.json())
+    return output
+}
+
+let questionArray = await getScale('./scale.json')
+
+console.log ('parse done');
+
+var trials = [];
+var choose = ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"];
+let i;
+let k = questionArray.length;
+
+function makeJsQuestion (questionArray, choose, k) {
+    for (i = 0; i < k; i++) {
+        trials[i]  /*property name or key of choice*/
+            = {
+                type: jsPsychSurveyLikert,
+                questions: [{
+                    prompt: questionArray[i]['prompt'],
+                    labels: choose
+                }],
+                data: { Q_num: `0`+ (i+1)}
+            };
+    }
+}
+
+makeJsQuestion (questionArray, choose, k);
+
+export { choose, trials };
+#+end_src
+
+**** welcomepage.js
+
+#+begin_src js :tangle server/www/welcome.js
 
 // var instru = `how you feel like you are a...`;
 var likert = ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"];
@@ -642,59 +707,26 @@ var blank = {
     data: { Q_num: 0 }
 };
 
-var show_data = {
+var submit_data = {
     type: jsPsychHtmlButtonResponse,
-    stimulus: `that's the end of this survey,thanks for your participation.`,
-    choices: ['Show results'],
+    stimulus: `that's the end of this survey, please clike 'submit' to submit your answers. Thanks for your participation.`,
+    choices: ['submit'],
     data: { Q_num: `drop` }
 };
 
-var Q1 = {
-    type: jsPsychSurveyLikert,
-    questions: [{
-        prompt: "I like vegatables.",
-        labels: likert
-    }],
-    // preamble: instru,
-    data: { Q_num: `01`}
-};
-
-trials.push (Q1);
-
-var Q2 = {
-    type: jsPsychSurveyLikert,
-    questions: [{
-        prompt: "I like cats",
-        labels: likert
-    }],
-    // preamble: instru,
-    data: { Q_num: `02`}
-};
-
-trials.push (Q2);
-
-var Q3 = {
-    type: jsPsychSurveyLikert,
-    questions: [{
-        prompt: "I like dogs",
-        labels: likert
-    }],
-    // preamble: instru,
-    data: { Q_num: `03`}
-};
-
-trials.push (Q3);
-
-export { start, blank, trials, show_data };
-
+export { start, blank, submit_data };
 #+end_src
 
-**** test-survey.js
+**** runSurvey.js
 
+This piece has loaded all prepared questions, and is the main script `index.php` will call.
 Since I used =async= funtion to assign presist presentation orders, the whole survey and related customized functions are needed to be wrapped into the resolve callback function.
-#+begin_src js :tangle server/www/test-survey.js
+#+begin_src js :tangle server/www/runSurvey.js
 // --------- Setting up questionnaire. -------------
-import { start, blank, trials, show_data } from './que-3.js';
+
+import { start, blank, submit_data } from './welcome.js';
+import { choose, trials } from './jsscalegen.js';
+
 console.log (trials);
 
 // ------- Functions to set up database connection ----------
@@ -743,24 +775,31 @@ const postData = async (data, uri) => {
     }
 };
 
-let promiseSuccess = (data) => {
+// main function to receive presentation order and run the survey
+
+let runSurvey = (data) => {
+
+
     if (data.length == 0) {
 	      document.write ('all presentation orders are fully assigned, please run "Rscript reset_counter.R" in terminal to run this survey again');
 	      throw 'all presentation orders are fully assigned, please run "Rscript reset_counter.R" in terminal to run this survey again';
     } else {
         var order_label = Object.values (data[0]);
         let order = order_label.slice (1, order_label.length).map (x => x + 1);
+        console.log (order)
         if (order.length < 10) {
 	          var order_str = order.map (i => "0" + i);
+            console.log (order_str);
         } else {
-	          for (j; j <= order.length - 1; j++) {
-	              let element = order[j];
-	              if (element.length == 1) {
-		                temp = "0" + element;
-		                order_str.push (temp);
-	              } else {
-		                order_str.push (order[j]);
-	              }
+	          for (let j; j <= order.length + 1; j++) {
+	              element = order[j];
+                console.log (element);
+                if (element.length == 1) {
+                    temp = "0" + element;
+                    order_str.push (temp);
+                } else {
+                    order_str.push (order[j]);
+                }
 	          }
         };
     };
@@ -808,14 +847,14 @@ let promiseSuccess = (data) => {
     });
 
     // ----------- Reorganize questions based on the given order. -------------
-
+    console.log ('orderstrhere' + order_str);
     var new_order = [];
     var v = 0;
     var id = 0;
-    console.log (trials[id].data);
-    for (v; v < order_str.length; v++) {
+
+    for (let v; v < order_str.length; v++) {
 	      while (trials[id].data.Q_num != order_str[v]) {
-	          id++;;
+	          id++;
 	      }
 	      new_order.push (trials[id]);
 	      id = 0; // repeatly matching.
@@ -824,12 +863,12 @@ let promiseSuccess = (data) => {
     console.log (new_order);
     var method = order_label [0];
     var fin_order = {timeline: new_order};
-    jsPsych.run([start, blank, fin_order, show_data]);
+    jsPsych.run([start, blank, fin_order, submit_data]);
 };
 
 var presOrder = getOrder();
 
-presOrder.then(promiseSuccess, (err) => {
+presOrder.then(runSurvey, (err) => {
     console.log(error);
 });
 #+end_src

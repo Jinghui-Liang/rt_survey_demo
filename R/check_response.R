@@ -25,22 +25,12 @@ con_t <- DBI::dbConnect(
                 password = Sys.getenv('DB_PASS'),
                 dbname = Sys.getenv('DB_NAME'))
 
-
-con_t <- DBI::dbConnect(
-  RMariaDB::MariaDB(),
-  host = 127.0.0.1,
-  port = 3306,
-  user = 'root',
-  password = "example",
-  dbname = "test")
-
-
 response <- tbl (con_t, "response") %>% collect()
 frequency <- tbl (con_t, "frequency_counter") %>% collect ()
 order <- tbl (con_t, "order_list") %>% collect ()
 match <- tbl (con_t, "order_match") %>% collect ()
 
-DBI::dbDisconnect(con_t)
+dbDisconnect(con_t)
 head (response)
 head (frequency)
 head (order)

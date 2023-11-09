@@ -1,5 +1,8 @@
 // --------- Setting up questionnaire. -------------
-import { start, blank, trials, show_data } from './que-3.js';
+
+import { start, blank, submit_data } from './welcome.js';
+import { choose, trials } from './jsscalegen.js';
+
 console.log (trials);
 
 // ------- Functions to set up database connection ----------
@@ -48,24 +51,31 @@ const postData = async (data, uri) => {
     }
 };
 
-let promiseSuccess = (data) => {
+// main function to receive presentation order and run the survey
+
+let runSurvey = (data) => {
+
+
     if (data.length == 0) {
 	      document.write ('all presentation orders are fully assigned, please run "Rscript reset_counter.R" in terminal to run this survey again');
 	      throw 'all presentation orders are fully assigned, please run "Rscript reset_counter.R" in terminal to run this survey again';
     } else {
         var order_label = Object.values (data[0]);
         let order = order_label.slice (1, order_label.length).map (x => x + 1);
+        console.log (order)
         if (order.length < 10) {
 	          var order_str = order.map (i => "0" + i);
+            console.log (order_str);
         } else {
-	          for (j; j <= order.length - 1; j++) {
-	              let element = order[j];
-	              if (element.length == 1) {
-		                temp = "0" + element;
-		                order_str.push (temp);
-	              } else {
-		                order_str.push (order[j]);
-	              }
+	          for (let j; j <= order.length + 1; j++) {
+	              element = order[j];
+                console.log (element);
+                if (element.length == 1) {
+                    temp = "0" + element;
+                    order_str.push (temp);
+                } else {
+                    order_str.push (order[j]);
+                }
 	          }
         };
     };
@@ -113,14 +123,14 @@ let promiseSuccess = (data) => {
     });
 
     // ----------- Reorganize questions based on the given order. -------------
-
+    console.log ('orderstrhere' + order_str);
     var new_order = [];
     var v = 0;
     var id = 0;
-    console.log (trials[id].data);
-    for (v; v < order_str.length; v++) {
+
+    for (let v; v < order_str.length; v++) {
 	      while (trials[id].data.Q_num != order_str[v]) {
-	          id++;;
+	          id++;
 	      }
 	      new_order.push (trials[id]);
 	      id = 0; // repeatly matching.
@@ -129,11 +139,11 @@ let promiseSuccess = (data) => {
     console.log (new_order);
     var method = order_label [0];
     var fin_order = {timeline: new_order};
-    jsPsych.run([start, blank, fin_order, show_data]);
+    jsPsych.run([start, blank, fin_order, submit_data]);
 };
 
 var presOrder = getOrder();
 
-presOrder.then(promiseSuccess, (err) => {
+presOrder.then(runSurvey, (err) => {
     console.log(error);
 });
