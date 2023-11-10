@@ -1,6 +1,5 @@
 
 * *TODO* Check =db_conf.R=, explain "host" <- "dbname" <- =env_dbname=
-
 * About
 
 Reaction time (RT) for items in psychometric questionnaires reflect participants' immediate mental status during thier response processes. Yet none of the popular data collection platforms allow collecting individual RT for each item. This demo provides an environment to collect such data based on various programming languages (R / JavaScript / PHP / HTML) that interactively work. It also contains randomized and pseudorandomized design strategies to organize the presentation order of a questionnaire in order to explore item effects and sequential effects in psychometric survey.
@@ -10,10 +9,12 @@ Reaction time (RT) for items in psychometric questionnaires reflect participants
 To download this platform, put the lines below in termianl (or command prompt on Windows).
 #+begin_src shell :results silent
 git clone https://github.com/Jinghui-Liang/rt_survey_demo.git
-cd rt_survey_demo
+cd path/to/rt_survey_demo
 #+end_src
 
 ** Using this survey with default settings
+
+*** The first step
 
 This platform uses =.env= file to setup all connection configuration. This config allows you to test everything with your local machine. For Emacs user, use =C-u C-c C-v C-t= to tangle changes *ONLY* with this block. Or you can open =.env= with a editor you like and change the config to the corresponding values, if you want to upload this platform to your server or make any changes.
 
@@ -27,34 +28,85 @@ DB_PASS=example
 MARIADB_VER=10.4
 #+end_src
 
-(*LOCAL TEST ONLY*) At this point, you might want to test any properties about this platform. We use a Docker container to build up a vital development environment since it relys on minimal dependencies. A default =docker-compose.yaml= file has been written to build a container and you only need to put this command line to make it work.
+*** Working examples
+
+"Type something within a pure text file then everything works?", I can see painful faces for people who are not having programming experience. However, we are trying our best to make everything as simple as possible. To illustrate this, you can try using our working examples. These examples are all locally done. The only thing you need is to figure out how to open terminal/power prompt, and getting skilful in typing.
+
+- Find your terminal, open it
+- Change directory (=cd=) to the place where =re_survey_demo= stays
+
+#+begin_src shell
+cd /path/to/rt_survey_demo
+#+end_src
+
+- Then, type
 
 #+begin_src shell
 docker-compose up -d --build
+
+# after you notice you can type again
+
+./ConfigDB
+
+Are you running local test or uploading your platform to a server? (local/server) local
+The name of target questionnaire you would like to use, extension required: testScale.csv
 #+end_src
 
-Once the container is built or your platform is ready to go, execute a prepared binary =ConfigDB= on shell to initialize your database (local test only) and prepare necessary tables. It will ask if this test is run in an online environment or just undergoing test. It also asks you the the length of questionnaire(s) you use (we have a sample questionnaire with 3 item so just put =3= when being asked). A full example to have correct input arguments:
+- Then go to your browser, type =127.0.0.1:8080=, you can see a well organized questionnaire is done.
+
+I hope this can make a sense that it's not that hard to use our platform. However, for detailed usages, there are still something you should know to get better online reaction-time-record survey with out system.
+
+*** Generate ready-to-use files
+
+The following steps allow compiling files including converted questionnaire (in =JSON= format), corresponding database connection configuration, and presentation order tables.
+
+1. Edit =.env= file, make sure everything matches your production settings.
+2. Prepare your questionnaire file in =.csv= format, with the first column being your questions. Place each row with one question only.
+3. Make a copy of your questionnaire file and move it to =./scalepool= directory.
+4. Back to the root directory (=rt_survey_demo= by default, but you can surely rename it), open the binary =ConfigDB=. Following the instruction, put =server= as your first argument to let gener  ator know it should follow slightly settings based on your demand. Hit the return, then type the name of your =.csv= questionnaire **WITH EXTENSION**.
+5. When you see =Initialization done= display on your terminal, that you want to access =./server/www=, and =www= folder is the wrapper you would like to submit to server.
 
 #+begin_src shell
 ./ConfigDB
 
-Are you running local test or uploading your platform to a server? (local/server) local
-Please type the length of your questionnaire 3
+Are you running local test or uploading your platform to a server? (local/server) server
+The name of target questionnaire you would like to use, extension required: your_questionnaire_name.csv
 #+end_src
 
-When you see =DONE= displayed on shell and if
+*** Test your questionnaire
 
-1) you are running local test, this binary will generate a database with the same name as =DB_NAME= in your =.env= file. You can log in to your survey on your browser by =127.0.0.1:8080= (all users) or =localhost:8080= (MacOS and Linux users only). The corresponding database can be accessed by shell command =mysql -h 127.0.0.1 -u USR_NAME -P 3306 -p=, with password =DB_PASS= (=USR_NAME= and =DB_PASS= should be the same as you set in =.env= file).
+It's common that you would like to test everything before launching your survey. Regarding this case, we used a Docker container to build up a vital development environment. Although the processes are quite similar as above, I'll still list the full details in case you don't want to scroll up again:
 
-When finishing the test, put this terminal command line:
+1. You don't have to change anything from =.env= unless you are unhappy with that.
+2. Put =docker-compose up -d --build= to command line to activate the Docker container we papered for users.
+3. Prepare your questionnaire file in =.csv= format, with the first column being your questions. Place each row with one question only.
+4. Make a copy of your questionnaire file and move it to =./scalepool= directory.
+5. Back to the root directory (=rt_survey_demo= by default, but you can surely rename it), open the binary =ConfigDB=. Following the instruction, put =local= as your first argument to let =ConfigDB= know you are doing test. Hit the return, then type the name of your =.csv= questionnaire **WITH EXTENSION**.
+6. When you see =Initialization done= display on your terminal, open your preferred browser and go to =localhost:8080= (MacOS/Linux) or =127.0.0.1= (All operation system) to check if questionnaire are appropriate loaded.
+7. If you would like to manage your database:
+   - go to the terminal and type: =mysql -h 127.0.0.1 -u root -P 3306 -p=, hit enter and type your password (you can see it from =.env=) or use preferred database management IDEs
+   - you will find a database with the same name as your questionnaire without extension.
+8. When finishing testing, don't forget putting =docker-compose down= on your terminal to save some memory.
 
-#+begin_src shell
-docker-compose down
-#+end_src
+*** What is supposed to be seen from the browser
 
-to turn off the container; or
+Regardless what kind of settings you've done, you should see a welcome page and a "start again" page displaying first, then your questionnaire follows. The welcome page shows as a greeting (easy enough to understand). However, the "start again" page is not a duplicate one -- we actually start measuring participant's reaction time at this point and use it as our "baseline", because the only thing participants will do is reading and clicking -- no choosing process are needed for them. After all your questions are displayed, participants will see the ending page with a "submit" button. Their responses and all other data will not be saved to database unless they click that button.
 
-2) you are about to run this platform online, you can upload the =www= folder to your server (located on =./server/www=) and you are good to go.
+Text of welcome page and ending pages are changeable. Check out the =server/www/welcome.js= file and edit the context and you're good to go.
+
+*** What if I want to use another questionnaire?
+
+Just prepare another =.csv= file and move that to =./scalepool= as you did. Then run the =ConfigDB= with corresponding argument. Done.
+
+- For launching your survey online, notice that your previous =www= folder will be covered. Make sure you've had a copy of that, or you are okay with the cover.
+- For local test, =ConfigDB= will generate a new database based on your questinnaire name.
+
+*** What will be upgraded next time
+
+For one who's wanting to explore the basis of this platform we believe it's the point you can safely close this page. However, we actually developed couple practical functions allows researchers to have more possibility to combine quasirandomization, reaction time, and response together, therefore having more detailed understanding about immediate psychological status changes. So next time the following pieces will be upgraded and included into the "Quick Start" part:
+
+- Enlarging your sample
+- Quickly access and management your data
 
 ** Presentation orders
 
@@ -727,8 +779,6 @@ Since I used =async= funtion to assign presist presentation orders, the whole su
 import { start, blank, submit_data } from './welcome.js';
 import { choose, trials } from './jsscalegen.js';
 
-console.log (trials);
-
 // ------- Functions to set up database connection ----------
 
 const getData = async (data, uri) => {
@@ -779,21 +829,19 @@ const postData = async (data, uri) => {
 
 let runSurvey = (data) => {
 
-
     if (data.length == 0) {
 	      document.write ('all presentation orders are fully assigned, please run "Rscript reset_counter.R" in terminal to run this survey again');
 	      throw 'all presentation orders are fully assigned, please run "Rscript reset_counter.R" in terminal to run this survey again';
     } else {
         var order_label = Object.values (data[0]);
         let order = order_label.slice (1, order_label.length).map (x => x + 1);
-        console.log (order)
         if (order.length < 10) {
 	          var order_str = order.map (i => "0" + i);
             console.log (order_str);
         } else {
-	          for (let j; j <= order.length + 1; j++) {
-	              element = order[j];
-                console.log (element);
+            var order_str = [];
+	          for (let j = 0; j <= order.length - 1; j++) {
+	              let  element = order[j];
                 if (element.length == 1) {
                     temp = "0" + element;
                     order_str.push (temp);
@@ -847,18 +895,17 @@ let runSurvey = (data) => {
     });
 
     // ----------- Reorganize questions based on the given order. -------------
-    console.log ('orderstrhere' + order_str);
     var new_order = [];
-    var v = 0;
     var id = 0;
 
-    for (let v; v < order_str.length; v++) {
+    for (let v = 0; v < order_str.length; v++) {
 	      while (trials[id].data.Q_num != order_str[v]) {
-	          id++;
-	      }
+	          id++
+	      };
 	      new_order.push (trials[id]);
 	      id = 0; // repeatly matching.
     };
+
     console.log (order_label);
     console.log (new_order);
     var method = order_label [0];

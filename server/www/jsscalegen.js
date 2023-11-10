@@ -6,6 +6,10 @@ const getScale = async(uri) => {
 
 let questionArray = await getScale('./scale.json')
 
+for (let l; l < 4; l++) {
+    console.log ('loop works');
+}
+
 console.log ('parse done');
 
 var trials = [];

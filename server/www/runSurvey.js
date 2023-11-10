@@ -3,8 +3,6 @@
 import { start, blank, submit_data } from './welcome.js';
 import { choose, trials } from './jsscalegen.js';
 
-console.log (trials);
-
 // ------- Functions to set up database connection ----------
 
 const getData = async (data, uri) => {
@@ -55,21 +53,19 @@ const postData = async (data, uri) => {
 
 let runSurvey = (data) => {
 
-
     if (data.length == 0) {
 	      document.write ('all presentation orders are fully assigned, please run "Rscript reset_counter.R" in terminal to run this survey again');
 	      throw 'all presentation orders are fully assigned, please run "Rscript reset_counter.R" in terminal to run this survey again';
     } else {
         var order_label = Object.values (data[0]);
         let order = order_label.slice (1, order_label.length).map (x => x + 1);
-        console.log (order)
         if (order.length < 10) {
 	          var order_str = order.map (i => "0" + i);
             console.log (order_str);
         } else {
-	          for (let j; j <= order.length + 1; j++) {
-	              element = order[j];
-                console.log (element);
+            var order_str = [];
+	          for (let j = 0; j <= order.length - 1; j++) {
+	              let  element = order[j];
                 if (element.length == 1) {
                     temp = "0" + element;
                     order_str.push (temp);
@@ -123,18 +119,17 @@ let runSurvey = (data) => {
     });
 
     // ----------- Reorganize questions based on the given order. -------------
-    console.log ('orderstrhere' + order_str);
     var new_order = [];
-    var v = 0;
     var id = 0;
 
-    for (let v; v < order_str.length; v++) {
+    for (let v = 0; v < order_str.length; v++) {
 	      while (trials[id].data.Q_num != order_str[v]) {
-	          id++;
-	      }
+	          id++
+	      };
 	      new_order.push (trials[id]);
 	      id = 0; // repeatly matching.
     };
+
     console.log (order_label);
     console.log (new_order);
     var method = order_label [0];
