@@ -42,7 +42,7 @@ MARIADB_VER=10.4
 "Type something within a pure text file then everything works?", I can see painful faces for people who are not having programming experience. However, we are trying our best to make everything as simple as possible. To illustrate this, you can try using our working examples. These examples are all locally done. The only thing you need is to figure out how to open terminal/power prompt, and getting skilful in typing.
 
 - Find your terminal, open it
-- Change directory (=cd=) to the place where =re_survey_demo= stays
+- Change directory (=cd=) to the place where =rt_survey_demo= stays
 
 #+begin_src shell
 cd /path/to/rt_survey_demo
@@ -218,7 +218,7 @@ cat (prompt2)
 quest_name <- readLines("stdin", n = 1)
 
 tryCatch (source ("R/make_scale.R"),
-          error = getwd())
+          error = browser())
 
 cat ("Questionnaire has parsed and saved to `www` \n")
 
@@ -237,7 +237,6 @@ cat ("Arguments accepted, inatialising ...... \n")
 if (position == "local") {
   env_dbname <- tools::file_path_sans_ext (quest_name)
   env_server <- '127.0.0.1'
-  env_port <- '3306'
   source ("R/init_db.R")
 } else if (position == "server") {
   env_dbname <- Sys.getenv('DB_NAME')
@@ -263,7 +262,7 @@ if (!interactive()) {
   dat <- data.frame (read.csv (paste0 ("./scalepool/", quest_name),
     header = FALSE))
   } else {
-  dat <- data.frame (read.csv ('./scalepool/test-scale.csv', header = FALSE))
+  dat <- data.frame (read.csv ('./scalepool/testScale.csv', header = FALSE))
 }
 
 names(dat)[1] <- "prompt"
@@ -438,7 +437,7 @@ DBI::dbDisconnect(con_t)
 
 #+begin_src R :results silent :tangle R/db_conf.R
 template <- "[database]\ndriver = mysql\nhost = %s\nport = %s\ndbname = %s\nusername = %s\npassword = %s"
-conf <- sprintf(template, "test", env_port, env_dbname, env_usr, env_password)
+conf <- sprintf(template, "127.0.0.1", env_port, env_dbname, env_usr, env_password)
 
 writeLines(conf, 'server/www/private/conf.ini')
 #+end_src

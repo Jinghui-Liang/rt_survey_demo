@@ -9,7 +9,7 @@ cat (prompt2)
 quest_name <- readLines("stdin", n = 1)
 
 tryCatch (source ("R/make_scale.R"),
-          error = getwd())
+          error = browser())
 
 cat ("Questionnaire has parsed and saved to `www` \n")
 
@@ -28,7 +28,6 @@ cat ("Arguments accepted, inatialising ...... \n")
 if (position == "local") {
   env_dbname <- tools::file_path_sans_ext (quest_name)
   env_server <- '127.0.0.1'
-  env_port <- '3306'
   source ("R/init_db.R")
 } else if (position == "server") {
   env_dbname <- Sys.getenv('DB_NAME')
