@@ -29,7 +29,7 @@ This platform uses =.env= file to setup all connection configuration. This confi
 
 #+begin_src text :tangle .env :mkdirp yes
 HTTP_PORT=8080
-SQL_PORT=3306
+SQL_PORT=3308
 SERVER_NAME=php2
 USR_NAME=root
 DB_NAME=test
@@ -232,15 +232,16 @@ env_password <- Sys.getenv('DB_PASS')
 env_usr <- Sys.getenv('USR_NAME')
 env_quest <- quest_name
 
+
 cat ("Arguments accepted, inatialising ...... \n")
 
 if (position == "local") {
   env_dbname <- tools::file_path_sans_ext (quest_name)
-  env_server <- '127.0.0.1'
+  env_server <- "127.0.0.1"
   source ("R/init_db.R")
 } else if (position == "server") {
+  env_server <- Sys.getenv('SERVER_NAME')
   env_dbname <- Sys.getenv('DB_NAME')
-  env_server <- Sys.getenv ('SERVER_NAME')
 } else {
   stop ('arguments must be either "local" or "server"')
 }
@@ -274,6 +275,7 @@ write(scaleJSON, "./server/www/scale.json")
 
 If you are testing on your local machine you need to manually set up the database.
 #+begin_src R :tangle R/init_db.R :mkdirp yes
+cat (env_server)
 con <- DBI::dbConnect(
               RMariaDB::MariaDB(),
               host = env_server,
@@ -437,7 +439,7 @@ DBI::dbDisconnect(con_t)
 
 #+begin_src R :results silent :tangle R/db_conf.R
 template <- "[database]\ndriver = mysql\nhost = %s\nport = %s\ndbname = %s\nusername = %s\npassword = %s"
-conf <- sprintf(template, "127.0.0.1", env_port, env_dbname, env_usr, env_password)
+conf <- sprintf(template, "test", env_port, env_dbname, env_usr, env_password)
 
 writeLines(conf, 'server/www/private/conf.ini')
 #+end_src
@@ -455,7 +457,7 @@ class dbConnect {
     public function __construct(){
         try {
             $conf = parse_ini_file(__DIR__ . '/conf.ini', true);
-            $dsn = sprintf('mysql:host=%s;port=%s;dbname=%s', $conf['database']['host'], $conf['database']['port'], $conf['database']['dbname']);
+            $dsn = sprintf('mysql:host=%s;port=3306;dbname=%s', $conf['database']['host'], $conf['database']['dbname']);
             $username = $conf['database']['username'];
             $password = $conf['database']['password'];
 

@@ -1,3 +1,4 @@
+cat (env_server)
 con <- DBI::dbConnect(
               RMariaDB::MariaDB(),
               host = env_server,
