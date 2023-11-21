@@ -14,7 +14,7 @@ services:
     volumes:
       - ./server/www:/var/www/html/
   db:
-    container_name: ${DB_NAME}
+    container_name: ${IMG_NAME}
     image: mariadb:${MARIADB_VER}
     ports:
       - ${SQL_PORT}:3306

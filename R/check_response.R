@@ -23,7 +23,7 @@ con_t <- DBI::dbConnect(
                 port = Sys.getenv('SQL_PORT'),
                 user = Sys.getenv('USR_NAME'),
                 password = Sys.getenv('DB_PASS'),
-                dbname = Sys.getenv('DB_NAME'))
+                dbname = Sys.getenv('SERVER_DB_NAME'))
 
 response <- tbl (con_t, "response") %>% collect()
 frequency <- tbl (con_t, "frequency_counter") %>% collect ()

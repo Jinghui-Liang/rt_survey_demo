@@ -23,16 +23,16 @@ env_password <- Sys.getenv('DB_PASS')
 env_usr <- Sys.getenv('USR_NAME')
 env_quest <- quest_name
 
-
 cat ("Arguments accepted, inatialising ...... \n")
 
 if (position == "local") {
-  env_dbname <- tools::file_path_sans_ext (quest_name)
+  env_dbname <- Sys.getenv('IMG_NAME')
+  sql_dbname <- tools::file_path_sans_ext (quest_name)
   env_server <- "127.0.0.1"
   source ("R/init_db.R")
 } else if (position == "server") {
   env_server <- Sys.getenv('SERVER_NAME')
-  env_dbname <- Sys.getenv('DB_NAME')
+  env_dbname <- Sys.getenv('SERVER_DB_NAME')
 } else {
   stop ('arguments must be either "local" or "server"')
 }

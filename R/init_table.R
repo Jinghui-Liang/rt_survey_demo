@@ -4,7 +4,7 @@ con_t <- DBI::dbConnect(
                 port = env_port,
                 user = env_usr,
                 password = env_password,
-                dbname = env_dbname)
+                dbname = sql_dbname)
 
 query <- "CREATE OR REPLACE TABLE response (
       p_id VARCHAR(999), 
@@ -21,4 +21,4 @@ query <- "CREATE OR REPLACE TABLE response (
 rs <- DBI::dbSendQuery(con_t, query)
 DBI::dbClearResult (rs)
 
-cat ("response table generated successfully")
+cat ("response table generated successfully \n")

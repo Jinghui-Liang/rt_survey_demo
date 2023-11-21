@@ -1,4 +1,3 @@
-cat (env_server)
 con <- DBI::dbConnect(
               RMariaDB::MariaDB(),
               host = env_server,
@@ -6,10 +5,10 @@ con <- DBI::dbConnect(
               user = env_usr,
               password = env_password)
 
-stmt_db <- paste ('CREATE DATABASE', env_dbname)
+stmt_db <- paste ('CREATE DATABASE', sql_dbname)
 
 rs <- DBI::dbSendStatement(con, stmt_db)
 DBI::dbClearResult (rs)
 DBI::dbDisconnect(con)
 
-cat ("database generated successfully")
+cat ("database generated successfully \n")

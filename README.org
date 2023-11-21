@@ -29,10 +29,11 @@ This platform uses =.env= file to setup all connection configuration. This confi
 
 #+begin_src text :tangle .env :mkdirp yes
 HTTP_PORT=8080
-SQL_PORT=3308
+SQL_PORT=3307
 SERVER_NAME=php2
 USR_NAME=root
-DB_NAME=test
+SERVER_DB_NAME=test
+IMG_NAME=localMaria
 DB_PASS=example
 MARIADB_VER=10.4
 #+end_src
@@ -192,7 +193,7 @@ services:
     volumes:
       - ./server/www:/var/www/html/
   db:
-    container_name: ${DB_NAME}
+    container_name: ${IMG_NAME}
     image: mariadb:${MARIADB_VER}
     ports:
       - ${SQL_PORT}:3306
@@ -232,16 +233,16 @@ env_password <- Sys.getenv('DB_PASS')
 env_usr <- Sys.getenv('USR_NAME')
 env_quest <- quest_name
 
-
 cat ("Arguments accepted, inatialising ...... \n")
 
 if (position == "local") {
-  env_dbname <- tools::file_path_sans_ext (quest_name)
+  env_dbname <- Sys.getenv('IMG_NAME')
+  sql_dbname <- tools::file_path_sans_ext (quest_name)
   env_server <- "127.0.0.1"
   source ("R/init_db.R")
 } else if (position == "server") {
   env_server <- Sys.getenv('SERVER_NAME')
-  env_dbname <- Sys.getenv('DB_NAME')
+  env_dbname <- Sys.getenv('SERVER_DB_NAME')
 } else {
   stop ('arguments must be either "local" or "server"')
 }
@@ -275,7 +276,7 @@ write(scaleJSON, "./server/www/scale.json")
 
 If you are testing on your local machine you need to manually set up the database.
 #+begin_src R :tangle R/init_db.R :mkdirp yes
-cat (env_server)
+
 con <- DBI::dbConnect(
               RMariaDB::MariaDB(),
               host = env_server,
@@ -283,13 +284,13 @@ con <- DBI::dbConnect(
               user = env_usr,
               password = env_password)
 
-stmt_db <- paste ('CREATE DATABASE', env_dbname)
+stmt_db <- paste ('CREATE DATABASE', sql_dbname)
 
 rs <- DBI::dbSendStatement(con, stmt_db)
 DBI::dbClearResult (rs)
 DBI::dbDisconnect(con)
 
-cat ("database generated successfully")
+cat ("database generated successfully \n")
 #+end_src
 
 *** Tables for storing data and recording id-order pairs
@@ -302,7 +303,7 @@ con_t <- DBI::dbConnect(
                 port = env_port,
                 user = env_usr,
                 password = env_password,
-                dbname = env_dbname)
+                dbname = sql_dbname)
 
 query <- "CREATE OR REPLACE TABLE response (
       p_id VARCHAR(999), 
@@ -319,13 +320,13 @@ query <- "CREATE OR REPLACE TABLE response (
 rs <- DBI::dbSendQuery(con_t, query)
 DBI::dbClearResult (rs)
 
-cat ("response table generated successfully")
+cat ("response table generated successfully \n")
 #+end_src
 
 **** Create table for recording presentation order in R.
 
 #+begin_src R :results silent :tangle R/generate_order.R
-cat ("generate_order.R read")
+cat ("reading generate_order.R")
 options (tidyverse.quiet = TRUE)
 library (tidyverse)
 set.seed (666) ## since it would be sourced by other scripts it should be reproducible.
@@ -439,7 +440,7 @@ DBI::dbDisconnect(con_t)
 
 #+begin_src R :results silent :tangle R/db_conf.R
 template <- "[database]\ndriver = mysql\nhost = %s\nport = %s\ndbname = %s\nusername = %s\npassword = %s"
-conf <- sprintf(template, "test", env_port, env_dbname, env_usr, env_password)
+conf <- sprintf(template, env_dbname, env_port, sql_dbname, env_usr, env_password)
 
 writeLines(conf, 'server/www/private/conf.ini')
 #+end_src
@@ -938,7 +939,7 @@ con_t <- DBI::dbConnect(
                 port = Sys.getenv('SQL_PORT'),
                 user = Sys.getenv('USR_NAME'),
                 password = Sys.getenv('DB_PASS'),
-                dbname = Sys.getenv('DB_NAME'))
+                dbname = Sys.getenv('SERVER_DB_NAME'))
 
 response <- tbl (con_t, "response") %>% collect()
 frequency <- tbl (con_t, "frequency_counter") %>% collect ()
