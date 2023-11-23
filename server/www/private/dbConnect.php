@@ -9,7 +9,7 @@ class dbConnect {
     public function __construct(){
         try {
             $conf = parse_ini_file(__DIR__ . '/conf.ini', true);
-            $dsn = sprintf('mysql:host=%s;port=3306;dbname=%s', $conf['database']['host'], $conf['database']['dbname']);
+            $dsn = sprintf('mysql:host=db;port=3306;dbname=%s', $conf['database']['dbname']);
             $username = $conf['database']['username'];
             $password = $conf['database']['password'];
 
