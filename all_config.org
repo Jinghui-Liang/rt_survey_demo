@@ -122,12 +122,21 @@ if (!interactive()) {
   dat <- data.frame (read.csv (paste0 ("./scalepool/", quest_name),
     header = FALSE))
   } else {
-  dat <- data.frame (read.csv ('./scalepool/testScale.csv', header = FALSE))
+  dat <- data.frame (read.csv ('../scalepool/testScale.csv', header = FALSE))
 }
 
 names(dat)[1] <- "prompt"
 scaleJSON <- jsonlite::toJSON (dat, pretty = TRUE)
 write(scaleJSON, "./server/www/scale.json")
+#+end_src
+
+*** TODO upgraded R Scale generator
+
+Waiting to be copied over. Not tangled yet.
+
+#+begin_src R
+dat <- read.csv ('../scalepool/fullScale.csv', header = TRUE,
+                 na.strings = "")
 #+end_src
 
 *** Database
