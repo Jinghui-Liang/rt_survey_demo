@@ -117,27 +117,64 @@ cat("Initialization done")
 *** R Scale generator
 
 #+begin_src R :tangle ./R/make_scale.R
-
-if (!interactive()) {
-  dat <- data.frame (read.csv (paste0 ("./scalepool/", quest_name),
-    header = FALSE))
-  } else {
-  dat <- data.frame (read.csv ('../scalepool/testScale.csv', header = FALSE))
+if (interactive()) {
+  dat <- tibble::as_tibble (read.csv (
+    '../scalepool/fullScale.csv',
+    header = TRUE,
+    na.strings = ""
+  ))
+} else {
+  dat <- tibble::as_tibble (read.csv (paste0 ("./scalepool/", quest_name),
+                               header = TRUE))
 }
 
-names(dat)[1] <- "prompt"
-scaleJSON <- jsonlite::toJSON (dat, pretty = TRUE)
-write(scaleJSON, "./server/www/scale.json")
+# split out questionnaire part
+quest <- dat[, c("question", "q_choices", "q_required")]
+colnames(quest)[colnames(quest) == "question"] <- "prompt"
+colnames(quest)[colnames(quest) == "q_choices"] <- "choices"
+
+if (!all(quest$q_required %in% c('y', 'n'))) {
+  stop ("Column q_required not properly defined.")
+}
+
+if (!is.na(quest$choices[1])) {
+  if (sum (is.na(quest$choices)) == 0) {
+    quest_js <- quest |>
+      dplyr::mutate (choices = purrr::map(quest$choices,
+                                   \(.x) unlist (strsplit(.x, split = "/"))))
+  } else if (sum (is.na(quest$choices)) == length (quest$choices) - 1) {
+    quest_js <- quest |> 
+      dplyr::mutate (choices = strsplit(quest$choices[1], split = "/"))
+  } else {
+    stop ('Column "q_hoices" not properly defined.')
+  }
+}
+
+scaleJSON <- jsonlite::toJSON(quest_js, pretty = TRUE)
+
+# split out demographic part
+demo <- dat[, c("demo_var", "d_question", "d_choices", "d_required")] |> 
+  dplyr::filter(demo_var != "NA")
+colnames(demo)[colnames(demo) == "d_question"] <- "prompt"
+colnames(demo)[colnames(demo) == "d_choices"] <- "choices"
+
+demo_strvar <- demo |> 
+  dplyr::filter (is.na(demo$choices)) |> 
+  dplyr::mutate (choices = list (NA))
+
+demo_catvar <- demo |> 
+  dplyr::filter (!is.na(choices)) |> 
+  dplyr::mutate (choices = purrr::map(choices,
+                                       \(.x) unlist (strsplit(.x, split = "/"))))
+demo_js <- dplyr::bind_rows(demo_strvar, demo_catvar)
+demoJSON <- jsonlite::toJSON(demo_js, pretty = TRUE)
+
+
+# write(scaleJSON, "./server/www/scale.json")
+write(demoJSON, "./server/www/demo.json")
 #+end_src
 
-*** TODO upgraded R Scale generator
-
-Waiting to be copied over. Not tangled yet.
-
-#+begin_src R
-dat <- read.csv ('../scalepool/fullScale.csv', header = TRUE,
-                 na.strings = "")
-#+end_src
+#+RESULTS:
 
 *** Database
 
@@ -270,6 +307,13 @@ query <- paste ("CREATE OR REPLACE TABLE", "demo", "(
     gender VARCHAR(999) 
     )")
 
+
+## piece for dynamically sending demo var name.
+## query <- paste0("CREATE OR REPLACE TABLE demo (",
+##                 paste0(sprintf("%s VARCHAR(999)", demo_js$demo_var), 
+##                        collapse = ","),
+##                 ")")
+
 rs <- DBI::dbSendStatement (con_t, query)
 DBI::dbClearResult (rs)
 
@@ -389,7 +433,7 @@ try{
 #+end_src
 
 ***** postMatch.php
-This is VERY important since it records which participant received which presentation order. The subsquent assignment of orders will rely on this record (which is also my research goal).
+This is VERY important since it records which participant received which presentation order. The subsequent assignment of orders will rely on this record (which is also my research goal).
 
 #+begin_src php :tangle server/www/postMatch.php
 <?php
@@ -508,7 +552,7 @@ try {
     <script src="https://unpkg.com/jspsych@7.0.0"></script>
     <script src="https://unpkg.com/@jspsych/plugin-html-button-response@1.0.0"></script>
     <script src="https://unpkg.com/@jspsych/plugin-survey-likert@1.0.0"></script>
-
+    <script src="https://unpkg.com/@jspsych/plugin-survey-text@1.0.0"></script>
     <style>
       .jspsych-btn {
       margin-bottom: 10px;
@@ -545,27 +589,62 @@ let questionArray = await getScale('./scale.json')
 console.log ('parse done');
 
 var trials = [];
-var choose = ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"];
 let i;
 let k = questionArray.length;
 
-function makeJsQuestion (questionArray, choose, k) {
+function makeJsQuestion (questionArray, k) {
     for (i = 0; i < k; i++) {
         trials[i]  /*property name or key of choice*/
             = {
                 type: jsPsychSurveyLikert,
                 questions: [{
                     prompt: questionArray[i]['prompt'],
-                    labels: choose
+                    labels: questionArray[i]['choices']
                 }],
                 data: { Q_num: `0`+ (i+1)}
             };
+        if (questionArray[i]['q_required'] == 'y') {
+            trials[i].questions[0].required = true;
+        } else {
+            trials[i].questions[0].required = false;
+        }
     }
 }
 
-makeJsQuestion (questionArray, choose, k);
+makeJsQuestion (questionArray, k);
 
-export { choose, trials };
+let demoArray = await getScale('./demo.json');
+
+var demos = [];
+let l;
+let m = demoArray.length;
+
+function makeJsDemo (demoArray, m) {
+    for (l = 0; l < m; l++) {
+        demos[l]  /*property name or key of choice*/
+            = {
+                questions: [{
+                    prompt: demoArray[l]['prompt']
+                }],
+                data: { Q_num: demoArray[l]['demo_var']}
+            };
+        if (demoArray[l]['choices'] == null) {
+            demos[l].type = jsPsychSurveyText;
+        } else {
+            demos[l].type = jsPsychSurveyLikert;
+        };
+        if (demoArray[l]['d_required'] == 'y') {
+            demos[l].questions[0].required = true;
+        } else {
+            demos[l].questions[0].required = false;
+        }
+    }
+}
+
+makeJsDemo (demoArray, m);
+console.log (demos);
+
+export { trials };
 #+end_src
 
 **** welcomepage.js
@@ -608,7 +687,7 @@ Since I used =async= funtion to assign presist presentation orders, the whole su
 // --------- Setting up questionnaire. -------------
 
 import { start, blank, submit_data } from './welcome.js';
-import { choose, trials } from './jsscalegen.js';
+import { trials } from './jsscalegen.js';
 
 // ------- Functions to set up database connection ----------
 

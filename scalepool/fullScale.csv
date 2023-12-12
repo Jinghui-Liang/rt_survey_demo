@@ -1,15 +1,15 @@
-﻿question,question_choices,forced,demo_info,demo_choice
-Question1,Strongly Disagree/Disagree/Neutral/Agree/Strongly Agree,y,age,
-Question2,,y,gender,male/female
-Question3,,y,education,high school/under graduate/postgraduate
-Question4,,y,email,
-Question5,,y,,
-Question6,,y,,
-Question7,,y,,
-Question8,,y,,
-Question9,,y,,
-Question10,,y,,
-Question11,,y,,
-Question12,,y,,
-Question13,,y,,
-Am always prepared.,,n,,
+﻿question,q_choices,q_required,demo_var,d_question,d_choices,d_required
+Question1,Strongly Disagree/Disagree/Neutral/Agree/Strongly Agree,y,age,How old are you?,,y
+Question2,,y,gender,What is your gender?,male/female,y
+Question3,,y,education,What is your educational background?,high school/under graduate/postgraduate,n
+Question4,,y,email,What is your email address?,,n
+Question5,,y,,,,
+Question6,,y,,,,
+Question7,,y,,,,
+Question8,,y,,,,
+Question9,,y,,,,
+Question10,,y,,,,
+Question11,,y,,,,
+Question12,,y,,,,
+Question13,,y,,,,
+Am always prepared.,,n,,,,

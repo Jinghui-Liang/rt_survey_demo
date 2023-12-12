@@ -1,7 +1,7 @@
 // --------- Setting up questionnaire. -------------
 
 import { start, blank, submit_data } from './welcome.js';
-import { choose, trials } from './jsscalegen.js';
+import { trials } from './jsscalegen.js';
 
 // ------- Functions to set up database connection ----------
 

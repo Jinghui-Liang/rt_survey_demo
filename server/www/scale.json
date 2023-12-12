@@ -1,44 +1,72 @@
 [
   {
-    "prompt": "Question1"
+    "prompt": "Question1",
+    "choices": ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"],
+    "q_required": "y"
   },
   {
-    "prompt": "Question2"
+    "prompt": "Question2",
+    "choices": ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"],
+    "q_required": "y"
   },
   {
-    "prompt": "Question3"
+    "prompt": "Question3",
+    "choices": ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"],
+    "q_required": "y"
   },
   {
-    "prompt": "Question4"
+    "prompt": "Question4",
+    "choices": ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"],
+    "q_required": "y"
   },
   {
-    "prompt": "Question5"
+    "prompt": "Question5",
+    "choices": ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"],
+    "q_required": "y"
   },
   {
-    "prompt": "Question6"
+    "prompt": "Question6",
+    "choices": ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"],
+    "q_required": "y"
   },
   {
-    "prompt": "Question7"
+    "prompt": "Question7",
+    "choices": ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"],
+    "q_required": "y"
   },
   {
-    "prompt": "Question8"
+    "prompt": "Question8",
+    "choices": ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"],
+    "q_required": "y"
   },
   {
-    "prompt": "Question9"
+    "prompt": "Question9",
+    "choices": ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"],
+    "q_required": "y"
   },
   {
-    "prompt": "Question10"
+    "prompt": "Question10",
+    "choices": ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"],
+    "q_required": "y"
   },
   {
-    "prompt": "Question11"
+    "prompt": "Question11",
+    "choices": ["Strongly Disagree", "Disagree"],
+    "q_required": "y"
   },
   {
-    "prompt": "Question12"
+    "prompt": "Question12",
+    "choices": ["Neutral", "Agree", "Strongly Agree"],
+    "q_required": "y"
   },
   {
-    "prompt": "Question13"
+    "prompt": "Question13",
+    "choices": ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"],
+    "q_required": "y"
   },
   {
-    "prompt": "Am always prepared."
+    "prompt": "Am always prepared.",
+    "choices": ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"],
+    "q_required": "n"
   }
 ]

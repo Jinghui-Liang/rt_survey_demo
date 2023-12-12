@@ -5,7 +5,7 @@
     <script src="https://unpkg.com/jspsych@7.0.0"></script>
     <script src="https://unpkg.com/@jspsych/plugin-html-button-response@1.0.0"></script>
     <script src="https://unpkg.com/@jspsych/plugin-survey-likert@1.0.0"></script>
-
+    <script src="https://unpkg.com/@jspsych/plugin-survey-text@1.0.0"></script>
     <style>
       .jspsych-btn {
       margin-bottom: 10px;
