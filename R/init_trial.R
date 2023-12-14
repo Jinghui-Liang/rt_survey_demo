@@ -14,19 +14,17 @@ query <- paste ("ALTER TABLE", "order_match", "MODIFY p_id VARCHAR(999)", sep = 
 rs <- DBI::dbSendStatement (con_t, query)
 DBI::dbClearResult (rs)
 
+## query <- paste ("CREATE OR REPLACE TABLE", "demo", "(
+##     p_id VARCHAR(999),
+##     age VARCHAR (999), 
+##     gender VARCHAR(999) 
+##     )")
 
-query <- paste ("CREATE OR REPLACE TABLE", "demo", "(
-    p_id VARCHAR(999),
-    age VARCHAR (999), 
-    gender VARCHAR(999) 
-    )")
-
-
-## piece for dynamically sending demo var name.
-## query <- paste0("CREATE OR REPLACE TABLE demo (",
-##                 paste0(sprintf("%s VARCHAR(999)", demo_js$demo_var), 
-##                        collapse = ","),
-##                 ")")
+query <- "CREATE OR REPLACE TABLE demo (
+                                        p_id VARCHAR(999),
+                                        value VARCHAR(999),
+                                        property VARCHAR (999)
+                                       );"
 
 rs <- DBI::dbSendStatement (con_t, query)
 DBI::dbClearResult (rs)

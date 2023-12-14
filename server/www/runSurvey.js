@@ -1,7 +1,7 @@
 // --------- Setting up questionnaire. -------------
 
-import { start, blank, submit_data } from './welcome.js';
-import { trials } from './jsscalegen.js';
+// import { start, blank, submit_data } from './welcome.js';
+import { trials, demos, start, blank, submit_data } from './jsscalegen.js';
 
 // ------- Functions to set up database connection ----------
 
@@ -52,16 +52,16 @@ const postData = async (data, uri) => {
 // main function to receive presentation order and run the survey
 
 let runSurvey = (data) => {
-
     if (data.length == 0) {
 	      document.write ('all presentation orders are fully assigned, please run "Rscript reset_counter.R" in terminal to run this survey again');
 	      throw 'all presentation orders are fully assigned, please run "Rscript reset_counter.R" in terminal to run this survey again';
     } else {
+        console.log(Object.values (data[0]));
         var order_label = Object.values (data[0]);
+        var method = order_label[0];
         let order = order_label.slice (1, order_label.length).map (x => x + 1);
         if (order.length < 10) {
 	          var order_str = order.map (i => "0" + i);
-            console.log (order_str);
         } else {
             var order_str = [];
 	          for (let j = 0; j <= order.length - 1; j++) {
@@ -77,27 +77,38 @@ let runSurvey = (data) => {
     };
 
     // use async function to get presentation order from mysql
-
     var jsPsych = initJsPsych({
         on_finish: function () {
 	          var p_id = jsPsych.randomization.randomID(4);
 	          jsPsych.data.addProperties({order_index: method,
 				                                p_id: p_id});
-	          var match = {
-	              p_id: p_id,
-	              order_label: method
-	          };
-	          console.log (match);
-	          let json = jsPsych.data.get()
-	              .filterCustom(trial => trial.trial_type == 'survey-likert')
+            let rawResult = jsPsych.data.get();
+            console.log (rawResult);
+            
+            let demoInfo = rawResult
+                .filterCustom(trial => trial.isDemo == true)
+                .trials.map (x => {
+                    let demoProperty = x.Q_num;
+                    let demoValue = x.response['Q0'];
+                    return ({
+                        p_id: x.p_id,
+                        property: demoProperty,
+                        value: demoValue
+                    })
+                });
+            console.log(demoInfo);
+
+            let json = rawResult
+	              .filterCustom(trial => trial.isDemo == false)
 	              .ignore('question_order');
+            
 	          let json_trials = json.trials.map(x => {
 	              let question = Object.keys(x.response)[0];
 	              let response = x.response[question];
 	              return ({
 		                p_id: x.p_id,
 		                rt: x.rt,
-		                response: x.response,
+		                response: x.response['Q0'],
 		                Q_num: x.Q_num,
 		                trial_type: x.trial_type,
 		                trial_index: x.trial_index,
@@ -106,35 +117,43 @@ let runSurvey = (data) => {
 		                internal_node_id: x.internal_node_id
 	              })
 	          });
-	          document.write (json_trials[0]);
-	          console.log (json_trials[0]);
+	          console.log (json_trials);
 	          let trial_data = {
 	              json_trials: json_trials,
 	              proc_method: 'insertLikertResp'
 	          };
-	          postData (match, 'postMatch.php');
+            let demo_data = {
+	              json_trials: demoInfo,
+	              proc_method: 'insertDemo'
+	          };
+            var match_data = {
+	              p_id: p_id,
+	              order_label: method
+	          };
+            postData (demo_data, 'postDemo.php');
+	          postData (match_data, 'postMatch.php');
 	          postData (trial_data, 'postData.php');
-	          console.log(JSON.stringify(trial_data));
+	          console.log('data succesfully submitted');
         }
     });
 
     // ----------- Reorganize questions based on the given order. -------------
     var new_order = [];
     var id = 0;
-
     for (let v = 0; v < order_str.length; v++) {
 	      while (trials[id].data.Q_num != order_str[v]) {
-	          id++
+	          id++;
 	      };
 	      new_order.push (trials[id]);
 	      id = 0; // repeatly matching.
     };
 
-    console.log (order_label);
-    console.log (new_order);
-    var method = order_label [0];
-    var fin_order = {timeline: new_order};
-    jsPsych.run([start, blank, fin_order, submit_data]);
+    // connect all trials
+    new_order.unshift(blank);
+    console.log(new_order);
+    var surveyBody = {timeline: demos.concat(new_order)};
+
+    jsPsych.run([start, surveyBody, submit_data]);
 };
 
 var presOrder = getOrder();

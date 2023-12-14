@@ -21,7 +21,8 @@ function makeJsQuestion (questionArray, k) {
                     prompt: questionArray[i]['prompt'],
                     labels: questionArray[i]['choices']
                 }],
-                data: { Q_num: `0`+ (i+1)}
+                data: { Q_num: `0`+ (i+1) ,
+                        isDemo: false }
             };
         if (questionArray[i]['q_required'] == 'y') {
             trials[i].questions[0].required = true;
@@ -29,12 +30,11 @@ function makeJsQuestion (questionArray, k) {
             trials[i].questions[0].required = false;
         }
     }
-}
+};
 
 makeJsQuestion (questionArray, k);
 
 let demoArray = await getScale('./demo.json');
-
 var demos = [];
 let l;
 let m = demoArray.length;
@@ -42,16 +42,19 @@ let m = demoArray.length;
 function makeJsDemo (demoArray, m) {
     for (l = 0; l < m; l++) {
         demos[l]  /*property name or key of choice*/
-            = {
+            = {                
+                type: null,
                 questions: [{
                     prompt: demoArray[l]['prompt']
                 }],
-                data: { Q_num: demoArray[l]['demo_var']}
+                data: { Q_num: demoArray[l]['demo_var'],
+                        isDemo: true }
             };
-        if (demoArray[l]['choices'] == null) {
-            demos[l].type = jsPsychSurveyText;
+        if (demoArray[l]['choices'][0] === null) {
+            demos[l]['type'] = jsPsychSurveyText;
         } else {
-            demos[l].type = jsPsychSurveyLikert;
+            demos[l]['type'] = jsPsychSurveyLikert;
+            demos[l].questions[0].labels = demoArray[l]['choices'];
         };
         if (demoArray[l]['d_required'] == 'y') {
             demos[l].questions[0].required = true;
@@ -59,9 +62,33 @@ function makeJsDemo (demoArray, m) {
             demos[l].questions[0].required = false;
         }
     }
-}
+};
 
 makeJsDemo (demoArray, m);
-console.log (demos);
+console.log(demos);
 
-export { trials };
+var start = {
+    type: jsPsychHtmlButtonResponse,
+    stimulus: '<p>Welcome to this behaviour survey, please press "start" to continue</p>',
+    choices: [`Start`],
+    data: { Q_num: 'start',
+            isDemo: null }
+};
+
+// timing starts here.
+var blank = {
+    type: jsPsychHtmlButtonResponse,
+    stimulus: 'Press "Start" again to begin the survey',
+    choices: [`Start`],
+    data: { Q_num: 0,
+            isDemo: false}
+};
+
+var submit_data = {
+    type: jsPsychHtmlButtonResponse,
+    stimulus: `that's the end of this survey, please clike 'submit' to submit your answers. Thanks for your participation.`,
+    choices: ['submit'],
+    data: { Q_num: `drop` }
+};
+
+export { trials, demos, start, blank, submit_data };

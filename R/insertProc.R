@@ -1,4 +1,4 @@
-query <- "CREATE OR REPLACE PROCEDURE insertLikertResp(IN json VARCHAR(9999))
+query_response <- "CREATE OR REPLACE PROCEDURE insertLikertResp(IN json VARCHAR(9999))
     INSERT INTO response (p_id, rt, response, Q_num, trial_type, trial_index, order_index, time_elapsed, internal_node_id)
     VALUES(
       JSON_EXTRACT(json, '$.p_id'),
@@ -12,7 +12,20 @@ query <- "CREATE OR REPLACE PROCEDURE insertLikertResp(IN json VARCHAR(9999))
       JSON_EXTRACT(json, '$.internal_node_id')
    )"
 
-rs <- DBI::dbSendStatement (con_t, query)
+
+
+query_demo <- "CREATE OR REPLACE PROCEDURE insertDemo(IN json VARCHAR(9999))
+    INSERT INTO demo (p_id, value, property)
+    VALUES(
+      JSON_EXTRACT(json, '$.p_id'),
+      JSON_EXTRACT(json, '$.value'),
+      JSON_EXTRACT(json, '$.property')
+   )"
+
+rs <- DBI::dbSendStatement (con_t, query_response)
+DBI::dbClearResult (rs)
+
+rs <- DBI::dbSendStatement (con_t, query_demo)
 DBI::dbClearResult (rs)
 
 DBI::dbDisconnect(con_t)

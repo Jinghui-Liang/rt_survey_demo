@@ -76,12 +76,11 @@ position <- readLines("stdin", n = 1)
 cat (prompt2)
 quest_name <- readLines("stdin", n = 1)
 
-tryCatch (source ("R/make_scale.R"),
-          error = browser())
+source ("R/make_scale.R")
 
 cat ("Questionnaire has parsed and saved to `www` \n")
 
-qlen <- nrow (dat)
+qlen <- nrow (quest)
 cat ("Reading evnironment configuration... \n")
 
 readRenviron(".env")
@@ -118,22 +117,26 @@ cat("Initialization done")
 
 #+begin_src R :tangle ./R/make_scale.R
 if (interactive()) {
-  dat <- tibble::as_tibble (read.csv (
-    '../scalepool/fullScale.csv',
-    header = TRUE,
-    na.strings = ""
-  ))
+  dat <- tibble::as_tibble (read.csv ('../scalepool/fullScale.csv',
+                                      header = TRUE,
+                                      na.strings = "",
+                                      fill = FALSE
+                                      ))
 } else {
   dat <- tibble::as_tibble (read.csv (paste0 ("./scalepool/", quest_name),
-                               header = TRUE))
+                                      header = TRUE,
+                                      fill = FALSE,
+                                      na.strings = ""))
 }
 
 # split out questionnaire part
-quest <- dat[, c("question", "q_choices", "q_required")]
+quest <- dat[, c("question", "q_choices", "q_required")] |> 
+  dplyr::filter(!is.na(question)) |> tibble::as_tibble()
 colnames(quest)[colnames(quest) == "question"] <- "prompt"
 colnames(quest)[colnames(quest) == "q_choices"] <- "choices"
 
-if (!all(quest$q_required %in% c('y', 'n'))) {
+if (any(quest$q_required != "y" & quest$q_required != "n")) {
+  print (quest$q_required)
   stop ("Column q_required not properly defined.")
 }
 
@@ -146,7 +149,7 @@ if (!is.na(quest$choices[1])) {
     quest_js <- quest |> 
       dplyr::mutate (choices = strsplit(quest$choices[1], split = "/"))
   } else {
-    stop ('Column "q_hoices" not properly defined.')
+    stop ('Column "q_choices" not properly defined.')
   }
 }
 
@@ -170,7 +173,7 @@ demo_js <- dplyr::bind_rows(demo_strvar, demo_catvar)
 demoJSON <- jsonlite::toJSON(demo_js, pretty = TRUE)
 
 
-# write(scaleJSON, "./server/www/scale.json")
+write(scaleJSON, "./server/www/scale.json")
 write(demoJSON, "./server/www/demo.json")
 #+end_src
 
@@ -300,30 +303,28 @@ query <- paste ("ALTER TABLE", "order_match", "MODIFY p_id VARCHAR(999)", sep = 
 rs <- DBI::dbSendStatement (con_t, query)
 DBI::dbClearResult (rs)
 
+## query <- paste ("CREATE OR REPLACE TABLE", "demo", "(
+##     p_id VARCHAR(999),
+##     age VARCHAR (999), 
+##     gender VARCHAR(999) 
+##     )")
 
-query <- paste ("CREATE OR REPLACE TABLE", "demo", "(
-    p_id VARCHAR(999),
-    age VARCHAR (999), 
-    gender VARCHAR(999) 
-    )")
-
-
-## piece for dynamically sending demo var name.
-## query <- paste0("CREATE OR REPLACE TABLE demo (",
-##                 paste0(sprintf("%s VARCHAR(999)", demo_js$demo_var), 
-##                        collapse = ","),
-##                 ")")
+query <- "CREATE OR REPLACE TABLE demo (
+                                        p_id VARCHAR(999),
+                                        value VARCHAR(999),
+                                        property VARCHAR (999)
+                                       );"
 
 rs <- DBI::dbSendStatement (con_t, query)
 DBI::dbClearResult (rs)
 
 #+end_src
 
-*** Insert and store procedure (to handle with accepted data) in MySQL
+*** Generate multiple rows insertion MySQL function
 
 #+begin_src R :tangle R/insertProc.R
 
-query <- "CREATE OR REPLACE PROCEDURE insertLikertResp(IN json VARCHAR(9999))
+query_response <- "CREATE OR REPLACE PROCEDURE insertLikertResp(IN json VARCHAR(9999))
     INSERT INTO response (p_id, rt, response, Q_num, trial_type, trial_index, order_index, time_elapsed, internal_node_id)
     VALUES(
       JSON_EXTRACT(json, '$.p_id'),
@@ -337,7 +338,18 @@ query <- "CREATE OR REPLACE PROCEDURE insertLikertResp(IN json VARCHAR(9999))
       JSON_EXTRACT(json, '$.internal_node_id')
    )"
 
-rs <- DBI::dbSendStatement (con_t, query)
+query_demo <- "CREATE OR REPLACE PROCEDURE insertDemo(IN json VARCHAR(9999))
+    INSERT INTO demo (p_id, value, property)
+    VALUES(
+      JSON_EXTRACT(json, '$.p_id'),
+      JSON_EXTRACT(json, '$.value'),
+      JSON_EXTRACT(json, '$.property')
+   )"
+
+rs <- DBI::dbSendStatement (con_t, query_response)
+DBI::dbClearResult (rs)
+
+rs <- DBI::dbSendStatement (con_t, query_demo)
 DBI::dbClearResult (rs)
 
 DBI::dbDisconnect(con_t)
@@ -440,40 +452,29 @@ This is VERY important since it records which participant received which present
 require_once(__DIR__ . '/private/dbConnect.php');
 $dbCon = new dbConnect();
 $pdo = $dbCon->getPDO();
-       
+
 $json_string = json_decode(file_get_contents('php://input'), true);
-       
-try {    
+
+// $p_id = $json_string['p_id'];
+// $order_label = $json_string['order_label'];
+
+try {
     $data = array(
-        ':p_id' => $json_string['p_id'], 
+        ':p_id' => $json_string['p_id'],
         ':order_label' => $json_string['order_label']
     );
-    $test = $json_string['order_label'];
-    
 
-    // -- new here
-    $email = array(
-        ':p_id' => $json_string['p_id'], 
-        ':email' => $json_string['email']
-    );
-    // -- new ends
-       
     // change table names in the code below when use questionnaires with different length.
-       
+
     $querya = "INSERT INTO order_match (p_id, order_label) VALUES (:p_id, :order_label)";
     $stmt = $pdo->prepare($querya);
     $stmt->execute($data);
-       
+
     $queryb = "UPDATE frequency_counter SET n = n + 1 WHERE order_label = ?";
     $stmt = $pdo->prepare($queryb);
-    $stmt->execute([$test]);
- 
-    $queryc = "INSERT INTO email (p_id, email) VALUES (:p_id, :email)";
-    $stmt = $pdo->prepare($queryc);
-    $stmt->execute($email);
+    $stmt->execute(array($data[':order_label']));
 
-    echo 'success';
-       
+    echo 'Frequency refreshed.';
 } catch(PDOException $e) {
     http_response_code(500);
     echo $e -> getMessage();
@@ -491,11 +492,8 @@ $pdo = $dbCon->getPDO();
 $json_string = json_decode(file_get_contents('php://input'), true);
        
 try{
-
     $sql_proc = 'CALL ' . $json_string['proc_method'] . '(?)';
-
     $sth = $pdo->prepare($sql_proc);
-
     foreach ($json_string['json_trials'] as $x) {
         $sth->bindValue(1, json_encode($x), PDO::PARAM_STR);
         $sth->execute();
@@ -511,33 +509,46 @@ try{
 
 ***** postDemo.php
 
-#+begin_src php :tangle :tangle server/www/postDemo.php
+#+begin_src php :tangle server/www/postDemo.php
 <?php
 require_once(__DIR__ . '/private/dbConnect.php');
 $dbCon = new dbConnect();
 $pdo = $dbCon->getPDO();
-  
-$pdo = $dbCon->getPDO();
 
 $json_string = json_decode(file_get_contents('php://input'), true);
 
-try {    
-    $data = array(
-        ':p_id' => $json_string['p_id'], 
-        ':age' => $json_string['age'],
-        ':gender' => $json_string['gender']
-    );
+try {
 
-    $query = "INSERT INTO demo (p_id, age, gender) VALUES (:p_id, :age, :gender)";
-    $stmt = $pdo->prepare($query);
-    $stmt->execute($data);
+    // $demo_data = array(
+    //     ':p_id' => $json_string['p_id'], 
+    //     ':value' => $json_string['value'],
+    //     ':property' => $json_string['property']
+    // );
+
+    // echo $demo_data;
+    // $query = "INSERT INTO demo (p_id, value, property) VALUES (
+    //        JSON_EXTRACT(json_string, '$.p_id'),
+    //        JSON_EXTRACT(json_string, '$.value'),
+    //        JSON_EXTRACT(json_string, '$.property'))";
+
+    // $query = "INSERT INTO demo (p_id, value, property) VALUES (:p_id, :value, :property)";
+
+    // $stmt = $pdo->prepare($query);
+    // $stmt->execute($demo_data);
+
+    $sql_proc = 'CALL ' . $json_string['proc_method'] . '(?)';
+    $sth = $pdo->prepare($sql_proc);
+    foreach ($json_string['json_trials'] as $x) {
+        $sth->bindValue(1, json_encode($x), PDO::PARAM_STR);
+        $sth->execute();
+    };
 
     echo 'demo post success';
 
 } catch(PDOException $e) {
     http_response_code(500);
     echo $e -> getMessage();
-};
+    };
 
 ?>
 #+end_src
@@ -575,7 +586,7 @@ try {
 
 the execution of this piece generates a .js file including all questions within your .csv file, following `jsPsych`'s manner.
 A short questionnaire with 3 items just for testing.
-In formal survey you can add parameter =required: TRUE= right after =labels: likert= to create must-answer questions.
+
 #+begin_src js :tangle server/www/jsscalegen.js
 
 const getScale = async(uri) => {
@@ -601,7 +612,8 @@ function makeJsQuestion (questionArray, k) {
                     prompt: questionArray[i]['prompt'],
                     labels: questionArray[i]['choices']
                 }],
-                data: { Q_num: `0`+ (i+1)}
+                data: { Q_num: `0`+ (i+1) ,
+                        isDemo: false }
             };
         if (questionArray[i]['q_required'] == 'y') {
             trials[i].questions[0].required = true;
@@ -609,12 +621,11 @@ function makeJsQuestion (questionArray, k) {
             trials[i].questions[0].required = false;
         }
     }
-}
+};
 
 makeJsQuestion (questionArray, k);
 
 let demoArray = await getScale('./demo.json');
-
 var demos = [];
 let l;
 let m = demoArray.length;
@@ -622,16 +633,19 @@ let m = demoArray.length;
 function makeJsDemo (demoArray, m) {
     for (l = 0; l < m; l++) {
         demos[l]  /*property name or key of choice*/
-            = {
+            = {                
+                type: null,
                 questions: [{
                     prompt: demoArray[l]['prompt']
                 }],
-                data: { Q_num: demoArray[l]['demo_var']}
+                data: { Q_num: demoArray[l]['demo_var'],
+                        isDemo: true }
             };
-        if (demoArray[l]['choices'] == null) {
-            demos[l].type = jsPsychSurveyText;
+        if (demoArray[l]['choices'][0] === null) {
+            demos[l]['type'] = jsPsychSurveyText;
         } else {
-            demos[l].type = jsPsychSurveyLikert;
+            demos[l]['type'] = jsPsychSurveyLikert;
+            demos[l].questions[0].labels = demoArray[l]['choices'];
         };
         if (demoArray[l]['d_required'] == 'y') {
             demos[l].questions[0].required = true;
@@ -639,12 +653,36 @@ function makeJsDemo (demoArray, m) {
             demos[l].questions[0].required = false;
         }
     }
-}
+};
 
 makeJsDemo (demoArray, m);
-console.log (demos);
+console.log(demos);
 
-export { trials };
+var start = {
+    type: jsPsychHtmlButtonResponse,
+    stimulus: '<p>Welcome to this behaviour survey, please press "start" to continue</p>',
+    choices: [`Start`],
+    data: { Q_num: 'start',
+            isDemo: null }
+};
+
+// timing starts here.
+var blank = {
+    type: jsPsychHtmlButtonResponse,
+    stimulus: 'Press "Start" again to begin the survey',
+    choices: [`Start`],
+    data: { Q_num: 0,
+            isDemo: false}
+};
+
+var submit_data = {
+    type: jsPsychHtmlButtonResponse,
+    stimulus: `that's the end of this survey, please clike 'submit' to submit your answers. Thanks for your participation.`,
+    choices: ['submit'],
+    data: { Q_num: `drop` }
+};
+
+export { trials, demos, start, blank, submit_data };
 #+end_src
 
 **** welcomepage.js
@@ -660,13 +698,6 @@ var start = {
     stimulus: '<p>Welcome to this behaviour survey, please press "start" to continue</p>',
     choices: [`Start`],
     data: { Q_num: `start` }
-};
-
-var blank = {
-    type: jsPsychHtmlButtonResponse,
-    stimulus: 'Press "Start" again to begin the survey',
-    choices: [`Start`],
-    data: { Q_num: 0 }
 };
 
 var submit_data = {
@@ -686,8 +717,8 @@ Since I used =async= funtion to assign presist presentation orders, the whole su
 #+begin_src js :tangle server/www/runSurvey.js
 // --------- Setting up questionnaire. -------------
 
-import { start, blank, submit_data } from './welcome.js';
-import { trials } from './jsscalegen.js';
+// import { start, blank, submit_data } from './welcome.js';
+import { trials, demos, start, blank, submit_data } from './jsscalegen.js';
 
 // ------- Functions to set up database connection ----------
 
@@ -738,16 +769,16 @@ const postData = async (data, uri) => {
 // main function to receive presentation order and run the survey
 
 let runSurvey = (data) => {
-
     if (data.length == 0) {
 	      document.write ('all presentation orders are fully assigned, please run "Rscript reset_counter.R" in terminal to run this survey again');
 	      throw 'all presentation orders are fully assigned, please run "Rscript reset_counter.R" in terminal to run this survey again';
     } else {
+        console.log(Object.values (data[0]));
         var order_label = Object.values (data[0]);
+        var method = order_label[0];
         let order = order_label.slice (1, order_label.length).map (x => x + 1);
         if (order.length < 10) {
 	          var order_str = order.map (i => "0" + i);
-            console.log (order_str);
         } else {
             var order_str = [];
 	          for (let j = 0; j <= order.length - 1; j++) {
@@ -763,27 +794,38 @@ let runSurvey = (data) => {
     };
 
     // use async function to get presentation order from mysql
-
     var jsPsych = initJsPsych({
         on_finish: function () {
 	          var p_id = jsPsych.randomization.randomID(4);
 	          jsPsych.data.addProperties({order_index: method,
 				                                p_id: p_id});
-	          var match = {
-	              p_id: p_id,
-	              order_label: method
-	          };
-	          console.log (match);
-	          let json = jsPsych.data.get()
-	              .filterCustom(trial => trial.trial_type == 'survey-likert')
+            let rawResult = jsPsych.data.get();
+            console.log (rawResult);
+            
+            let demoInfo = rawResult
+                .filterCustom(trial => trial.isDemo == true)
+                .trials.map (x => {
+                    let demoProperty = x.Q_num;
+                    let demoValue = x.response['Q0'];
+                    return ({
+                        p_id: x.p_id,
+                        property: demoProperty,
+                        value: demoValue
+                    })
+                });
+            console.log(demoInfo);
+
+            let json = rawResult
+	              .filterCustom(trial => trial.isDemo == false)
 	              .ignore('question_order');
+            
 	          let json_trials = json.trials.map(x => {
 	              let question = Object.keys(x.response)[0];
 	              let response = x.response[question];
 	              return ({
 		                p_id: x.p_id,
 		                rt: x.rt,
-		                response: x.response,
+		                response: x.response['Q0'],
 		                Q_num: x.Q_num,
 		                trial_type: x.trial_type,
 		                trial_index: x.trial_index,
@@ -792,35 +834,43 @@ let runSurvey = (data) => {
 		                internal_node_id: x.internal_node_id
 	              })
 	          });
-	          document.write (json_trials[0]);
-	          console.log (json_trials[0]);
+	          console.log (json_trials);
 	          let trial_data = {
 	              json_trials: json_trials,
 	              proc_method: 'insertLikertResp'
 	          };
-	          postData (match, 'postMatch.php');
+            let demo_data = {
+	              json_trials: demoInfo,
+	              proc_method: 'insertDemo'
+	          };
+            var match_data = {
+	              p_id: p_id,
+	              order_label: method
+	          };
+            postData (demo_data, 'postDemo.php');
+	          postData (match_data, 'postMatch.php');
 	          postData (trial_data, 'postData.php');
-	          console.log(JSON.stringify(trial_data));
+	          console.log('data succesfully submitted');
         }
     });
 
     // ----------- Reorganize questions based on the given order. -------------
     var new_order = [];
     var id = 0;
-
     for (let v = 0; v < order_str.length; v++) {
 	      while (trials[id].data.Q_num != order_str[v]) {
-	          id++
+	          id++;
 	      };
 	      new_order.push (trials[id]);
 	      id = 0; // repeatly matching.
     };
 
-    console.log (order_label);
-    console.log (new_order);
-    var method = order_label [0];
-    var fin_order = {timeline: new_order};
-    jsPsych.run([start, blank, fin_order, submit_data]);
+    // connect all trials
+    new_order.unshift(blank);
+    console.log(new_order);
+    var surveyBody = {timeline: demos.concat(new_order)};
+
+    jsPsych.run([start, surveyBody, submit_data]);
 };
 
 var presOrder = getOrder();
@@ -828,6 +878,7 @@ var presOrder = getOrder();
 presOrder.then(runSurvey, (err) => {
     console.log(error);
 });
+
 #+end_src
 
 **** Reset the frequenct counter using R

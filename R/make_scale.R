@@ -1,20 +1,24 @@
 if (interactive()) {
-  dat <- tibble::as_tibble (read.csv (
-    '../scalepool/fullScale.csv',
-    header = TRUE,
-    na.strings = ""
-  ))
+  dat <- tibble::as_tibble (read.csv ('../scalepool/fullScale.csv',
+                                      header = TRUE,
+                                      na.strings = "",
+                                      fill = FALSE
+                                      ))
 } else {
   dat <- tibble::as_tibble (read.csv (paste0 ("./scalepool/", quest_name),
-                               header = TRUE))
+                                      header = TRUE,
+                                      fill = FALSE,
+                                      na.strings = ""))
 }
 
 # split out questionnaire part
-quest <- dat[, c("question", "q_choices", "q_required")]
+quest <- dat[, c("question", "q_choices", "q_required")] |> 
+  dplyr::filter(!is.na(question)) |> tibble::as_tibble()
 colnames(quest)[colnames(quest) == "question"] <- "prompt"
 colnames(quest)[colnames(quest) == "q_choices"] <- "choices"
 
-if (!all(quest$q_required %in% c('y', 'n'))) {
+if (any(quest$q_required != "y" & quest$q_required != "n")) {
+  print (quest$q_required)
   stop ("Column q_required not properly defined.")
 }
 
@@ -27,7 +31,7 @@ if (!is.na(quest$choices[1])) {
     quest_js <- quest |> 
       dplyr::mutate (choices = strsplit(quest$choices[1], split = "/"))
   } else {
-    stop ('Column "q_hoices" not properly defined.')
+    stop ('Column "q_choices" not properly defined.')
   }
 }
 
@@ -51,5 +55,5 @@ demo_js <- dplyr::bind_rows(demo_strvar, demo_catvar)
 demoJSON <- jsonlite::toJSON(demo_js, pretty = TRUE)
 
 
-# write(scaleJSON, "./server/www/scale.json")
+write(scaleJSON, "./server/www/scale.json")
 write(demoJSON, "./server/www/demo.json")

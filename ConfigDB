@@ -8,12 +8,11 @@ position <- readLines("stdin", n = 1)
 cat (prompt2)
 quest_name <- readLines("stdin", n = 1)
 
-tryCatch (source ("R/make_scale.R"),
-          error = browser())
+source ("R/make_scale.R")
 
 cat ("Questionnaire has parsed and saved to `www` \n")
 
-qlen <- nrow (dat)
+qlen <- nrow (quest)
 cat ("Reading evnironment configuration... \n")
 
 readRenviron(".env")

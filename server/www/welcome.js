@@ -9,13 +9,6 @@ var start = {
     data: { Q_num: `start` }
 };
 
-var blank = {
-    type: jsPsychHtmlButtonResponse,
-    stimulus: 'Press "Start" again to begin the survey',
-    choices: [`Start`],
-    data: { Q_num: 0 }
-};
-
 var submit_data = {
     type: jsPsychHtmlButtonResponse,
     stimulus: `that's the end of this survey, please clike 'submit' to submit your answers. Thanks for your participation.`,
