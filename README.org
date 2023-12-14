@@ -57,68 +57,84 @@ docker-compose up -d --build
 ./ConfigDB
 
 Are you running local test or uploading your platform to a server? (local/server) local
-The name of target questionnaire you would like to use, extension required: testScale.csv
+The name of target questionnaire you would like to use, extension required: fullScale.csv
 #+end_src
 
 - When you see "Initialization done", go to your browser, type =127.0.0.1:8080=, you can see a well organized questionnaire is done.
 
 I hope this can make a sense that it's not that hard to use our platform. However, for detailed usages, there are still something you should know to get better online reaction-time-record survey with our system.
 
-*** Generate ready-to-use files
+*** How to organize your questionnaire file
 
-For users who have prepared an online database and know its configuration, the following steps allow compiling files including converted questionnaire (in =JSON= format), corresponding database connection configuration, and presentation order tables.
+Currently, this platform only accepts .csv format files. An example of this file looks like:
 
-1. Edit =.env= file, make sure everything matches your production settings.
-2. Prepare your questionnaire file in =.csv= format, with the first column being your questions. Place each row with one question only.
-3. Make a copy of your questionnaire file and move it to =./scalepool= directory.
-4. Back to the root directory (=rt_survey_demo= by default, but you can surely rename it), open the binary =ConfigDB=. Following the instruction, put =server= as your first argument to let generator know it should follow slightly settings based on your demand. Hit the return, then type the name of your =.csv= questionnaire **WITH EXTENSION**.
-5. When you see =Initialization done= display on your terminal, that you want to access =./server/www=, and =www= folder is the wrapper you would like to submit to server.
+| question                    | q_choices              | q_required | d_question                          | d_choices             | d_required |
+| Is today your lucky day?    | Disagree/Neutral/Agree | y          | How old are you?                    |                       | n          |
+| I feel so sad today.        |                        | n          | What's your educational background? | educated/not educated | n          |
+| Can tomorrow be better!     |                        | n          | What's your email address?          |                       | y          |
+
+This .csv file integrated questions and demography information together. To specify your survey, you should follow couple rules:
+
+- Fill the =question= column with your questions, each row a question.
+- The =q_choices= column is for response options. Options should be separate by slashed (=/=), no spaces are needed before of after the slash. You should only place your options in either way of below, other ways you get errors in productive:
+  1. Putting choices on first row of =q_choices=, in this way they become the default of all questions;
+  2. Set different options for specific questions, then fill the rest with your default choices. By doing so only the questions you specified come with different number of choices, while the rest remaining the same.
+- The =q_required= column specifies if this question is forced to response. If =y=, participants can't skip this and see the next question (questions are appearing one by one on the screen). If =n=, they can.
+- The =d_question= specifies demography information questions before the question starts.
+- The =d_choices= specifies the type of demography information input. If choices or response options are needed, put it as the same as =q_choices=. Leaving this row blank will make the corresponding demography information accepts text input.
+- =d_required= is the same as =q_required=, but controls =d_question=.
+- *IMPORTANT*: please *DO NOT* change the column names.
+
+*** Test your questionnaire
+
+It's common that you would like to test everything before launching your survey. Regarding this case, we used a Docker container to build up a virtual development environment so that you have more flexibility to customize the development environment to suit your case.
+
+**** General Steps
+
+1. You don't have to change anything from =.env= unless you want to (descried below).
+2. Put =docker-compose up -d --build= to command line to activate the Docker container we papered for users.
+3. Prepare your questionnaire file in =.csv= format, and copy it to =./scalepool= directory.
+4. Back to the root directory (=rt_survey_demo= by default, but you can surely rename it), open the binary =ConfigDB=. Following the instruction, put =local= as your first argument to let =ConfigDB= know you are doing test. Press return, then type the name of your =.csv= questionnaire **WITH EXTENSION**. You can ignore "incomplete final line found" error which may appear during the execution.
 
 #+begin_src shell
 ./ConfigDB
 
-Are you running local test or uploading your platform to a server? (local/server) server
+Are you running local test or uploading your platform to a server? (local/server) local
 The name of target questionnaire you would like to use, extension required: your_questionnaire_name.csv
 #+end_src
 
-*** Test your questionnaire
-
-It's common that you would like to test everything before launching your survey. Regarding this case, we used a Docker container to build up a virtual development environment. The processes are similar as above, but you have more flexibility to customize the development environment to suit your case.
-
-**** General Steps
-
-1. You don't have to change anything from =.env= unless you want to (see next session).
-2. Put =docker-compose up -d --build= to command line to activate the Docker container we papered for users.
-3. Prepare your questionnaire file in =.csv= format, with the first column being your questions. Place each row with one question only.
-4. Make a copy of your questionnaire file and move it to =./scalepool= directory.
-5. Back to the root directory (=rt_survey_demo= by default, but you can surely rename it), open the binary =ConfigDB=. Following the instruction, put =local= as your first argument to let =ConfigDB= know you are doing test. Press return, then type the name of your =.csv= questionnaire **WITH EXTENSION**. You can ignore "incomplete final line found" error which may appear during the execution.
-6. When you see =Initialization done= display on your terminal, open your preferred browser and go to =localhost:8080= (MacOS/Linux) or =127.0.0.1:8080= (All operating system) to check if questionnaire are appropriate loaded.
-7. If you would like to manage your database:
+5. When you see =Initialization done= display on your terminal, open your preferred browser and go to =localhost:8080= (MacOS/Linux) or =127.0.0.1:8080= (All operating system) to check if questionnaire are appropriate loaded.
+6. If you would like to manage your database:
    - **outside** the docker image: go to the terminal and type: =mysql -h 127.0.0.1 -u root -P ${SQL_PORT} -p= (where ${SQL_PORT} is 3306 by default), or
    - =docker exec -it localMariaDB sh= to call the shell **inside docker**, then =mysql -h 127.0.0.1 -u root -P 3306 -p= to access MariaDB;
    - hit enter and type your password (you can see it from =.env=) or use preferred database management IDEs,
    - you will find a database with the same name as your questionnaire without extension.
-8. When finishing testing, don't forget putting =docker-compose down= on your terminal to save some memory.
+7. When finishing testing, don't forget putting =docker-compose down= on your terminal to save some memory.
 
 **** Change the default
 
 - Once =docker-compose up -d --build= is executed, two containers will be created based on =.env= settings. First, the =php2= container is used to connect to virtual MariaDB environment. While the =localMariaDB= is the virtual database container where your data (responses) will be stored into. To modify MariaDB container name, change =IMG_NAME= in =.env=
 - This container network (i.e., connection between =php2= and MariaDB) uses default port 3306. However, you can customize the "outside" port to your prefer ones to suit your case. For example, changing =SQL_PORT=3308= in =.env= allows you to connect to the database inside docker with terminal command =mysql -h 127.0.0.1 -u root -P 3308 -p=. But if you are assessing the database inside docker, the port will always be 3306. You can check which port is used by command =docker ps=.
-- When conducting local test with docker, variable =SERVER_DB_NAME= will be ignored because the MariaDB database name will always be your questionnaire name. While generating submmitable =www= folder (say, typing =server= as =ConfigDB= argument), =IMG_NAME= will be ignored since =ConfigDB= no longer creates docker containers.
+- When conducting local test with docker, variable =SERVER_DB_NAME= will be ignored because the MariaDB database name will always be your questionnaire name.
 - If you want to test different questionnaires with the same docker/connection configuration, please refer to [[What if I want to use another questionnaire?]] session. However, if you would like to change the external port, username or other connection settings, make sure do =docker-compose down= first, then modify and save =.env=, then execute =docker-compose up -d --build= again to verify your changes.
+
+*** Generate ready-to-use files
+
+
+For users who have prepared an online database and know its configuration, that can prepare their questionnaire file like described above. Then you can edit =.env= to match their network/database setting. Execute =./ConfigDB=, put =server= as your first argument and your questionnaire name *WITH EXTENSION* as the second one. Scripts will configure everything and send them to your online database. When you see =Initialization done= display on your terminal, that you want to access =./server/www=, and =www= folder is the wrapper you would like to submit to server.
 
 *** What should be seen from the browser
 
-Regardless what kind of settings you've done, you should see a welcome page and a "start again" page displaying first, then your questionnaire follows. The welcome page shows as a greeting (easy enough to understand). However, the "start again" page is not a duplicate one -- we actually start measuring participant's reaction time at this point and use it as our "baseline", because the only thing participants will do is reading and clicking -- no choosing process are needed for them. After all your questions are displayed, participants will see the ending page with a "submit" button. Their responses and all other data will not be saved to database unless they click that button.
+Regardless what kind of settings you've done, you should see a welcome page, demography questions (if you have ones), and a "start again" page displaying first, then your questionnaire follows. The welcome page shows as a greeting (easy enough to understand). However, the "start again" page is not a duplicate one -- we actually start measuring participant's reaction time at this point and use it as our "baseline", because the only thing participants will do is reading and clicking -- no choosing process are needed for them. After all your questions are displayed, participants will see the ending page with a "submit" button. Their responses and all other data will not be saved to database unless they click that button.
 
-Text of welcome page and ending pages are changeable. Check out the =server/www/welcome.js= file and edit the context, and you're good to go.
+(under development) Text of welcome page and ending pages are changeable. Check out the =server/www/welcome.js= file and edit the context, and you're good to go.
 
 *** What if I want to use another questionnaire?
 
 Just prepare another =.csv= file and move that to =./scalepool= as you did. Then run the =ConfigDB= with corresponding argument. Done.
 
 - For launching your survey online, notice that your previous =www= folder will be covered. Make sure you've had a copy of that, or you are okay with the cover.
-- For local test, =ConfigDB= will generate a new database based on your questinnaire name.
+- For local test, =ConfigDB= will generate a new database based on your questionnaire name.
 
 *** Presentation orders
 
