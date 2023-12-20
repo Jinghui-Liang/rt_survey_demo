@@ -191,7 +191,7 @@ con <- DBI::dbConnect(
               user = env_usr,
               password = env_password)
 
-stmt_db <- paste ('CREATE DATABASE', sql_dbname)
+stmt_db <- paste ('CREATE DATABASE IF NOT EXISTS', sql_dbname)
 
 rs <- DBI::dbSendStatement(con, stmt_db)
 DBI::dbClearResult (rs)

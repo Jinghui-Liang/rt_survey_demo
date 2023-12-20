@@ -1,6 +1,8 @@
 ﻿question,q_choices,q_required,demo_var,d_question,d_choices,d_required
-Question1,Strongly Disagree/Disagree/Neutral/Agree/Strongly Agree,y,age,How old are you?,,n
-Question2,,y,gender,What is your gender,male/female,n
-Question3,,n,education,What is your educational background?,high school/under graduate/postgraduate,n
-Question4,,y,email,What is your email address?,,y
-Question5,,n,financial,What is your financial case?,low/mid/high,y
+I am the life of the party.,"Very Inaccurate/Moderately
+Inaccurate/Very
+Accurate",y,age,How old are you?,,n
+I feel little concern for others,,y,gender,What is your gender,male/female,n
+I am always prepared.,,n,education,What is your educational background?,high school/under graduate/postgraduate,n
+I get stressed out easily.,,y,email,What is your email address?,,y
+I have a rich vocabulary.,,n,financial,What is your financial case?,low/mid/high,y

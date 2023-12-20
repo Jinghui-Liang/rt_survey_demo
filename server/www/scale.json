@@ -1,27 +1,27 @@
 [
   {
-    "prompt": "Question1",
-    "choices": ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"],
+    "prompt": "I am the life of the party.",
+    "choices": ["Very Inaccurate", "Moderately\nInaccurate", "Very\nAccurate"],
     "q_required": "y"
   },
   {
-    "prompt": "Question2",
-    "choices": ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"],
+    "prompt": "I feel little concern for others",
+    "choices": ["Very Inaccurate", "Moderately\nInaccurate", "Very\nAccurate"],
     "q_required": "y"
   },
   {
-    "prompt": "Question3",
-    "choices": ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"],
+    "prompt": "I am always prepared.",
+    "choices": ["Very Inaccurate", "Moderately\nInaccurate", "Very\nAccurate"],
     "q_required": "n"
   },
   {
-    "prompt": "Question4",
-    "choices": ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"],
+    "prompt": "I get stressed out easily.",
+    "choices": ["Very Inaccurate", "Moderately\nInaccurate", "Very\nAccurate"],
     "q_required": "y"
   },
   {
-    "prompt": "Question5",
-    "choices": ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"],
+    "prompt": "I have a rich vocabulary.",
+    "choices": ["Very Inaccurate", "Moderately\nInaccurate", "Very\nAccurate"],
     "q_required": "n"
   }
 ]
