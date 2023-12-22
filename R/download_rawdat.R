@@ -1,13 +1,20 @@
 if(!interactive()) {
   prompt_position <- "Are you running local test or uploading your platform to a server? (local/server)"
-  prompt_conf <- "Do you want R to read .env file to get data or manually setting the config (only more than 1 survey are conducted)? (env/man)"
+  cat (prompt_position)
+  position <- readLines("stdin", n = 1)
+
+  ## ------ under development ------
+  prompt_questionnaire <- "Which database you would like to down data from?" 
+  ## ------
+
+  prompt_verbose <- "Do you want to download (f)ull data or just (r)esposne data? (f/r)"
+  cat (prompt_verbose)
+  verbose <- readLines("stdin", n = 1)
+  readRenviron("./.env")
+} else {
+  localdb <- "fullScale"
+  readRenviron("../.env")
 }
-
-
-cat(prompt_position)
-position <- readLines("stdin", n = 1)
-
-readRenviron("../.env")
 
 if (position == "local") {
   env_server <- '127.0.0.1'
@@ -17,15 +24,18 @@ if (position == "local") {
   stop ('arguments must be either "local" or "server"')
 }
 
-library(tidyverse)
+try ({
+  con_t <- DBI::dbConnect(
+                  RMariaDB::MariaDB(),
+                  host = env_server,
+                  port = Sys.getenv('SQL_PORT'),
+                  user = Sys.getenv('USR_NAME'),
+                  password = Sys.getenv('DB_PASS'),
+                  dbname = localdb)
+  },
+  error = stop (".env file not correctly confifgured.")
+)
 
-con_t <- DBI::dbConnect(
-                RMariaDB::MariaDB(),
-                host = env_server,
-                port = Sys.getenv('SQL_PORT'),
-                user = Sys.getenv('USR_NAME'),
-                password = Sys.getenv('DB_PASS'),
-                dbname = "fullScale")
 
 response <- tbl (con_t, "response") |> dplyr::collect ()
 demo <- tbl (con_t, "demo") |> dplyr::collect () |> 
@@ -37,9 +47,22 @@ order <- tbl (con_t, "order_list") |> dplyr::collect ()
 match <- tbl (con_t, "order_match") |> dplyr::collect ()
 
 if (!interactive()) {
-  dir.create(paste0("./raw_data/results-", Sys.Date()))
+  dir_name <- paste0("./raw_data/results-", Sys.Date(), "-", format(Sys.time(), "%X"))
 } else {
-  dir.create(paste0("../raw_data/results-", Sys.Date()))
+  dir_name <- paste0("../raw_data/results-", Sys.Date(), "-", format(Sys.time(), "%X"))
 }
-  
+
+dir.create(dir_name)
+
+if (verbose == "f") {
+  write.csv (demo, file = paste0(dir_name, "/demo.csv"))
+  write.csv (order, file = paste0(dir_name, "/order-list.csv"))
+  write.csv (match, file = paste0(dir_name, "/order-pid.csv"))
+  write.csv (frequency, file = paste0(dir_name, "/frequency-counter.csv"))
+} else if (verbose != "r") {
+  stop ("target data number not properly specified.")
+}
+
+write.csv (response, file = paste0(dir_name, "/response.csv"))
+
 DBI::dbDisconnect(con_t)

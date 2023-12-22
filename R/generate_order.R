@@ -6,11 +6,9 @@ set.seed (666) ## since it would be sourced by other scripts it should be reprod
 ## Method to generate a Latin-Square
 
 latin_template <- function(n){
-
   lat_sq <- array (rep (seq_len (n), each = n), c (n, n))
   lat_sq <- apply (lat_sq - 1, 2, function (x) (x + 0:(n-1)) 
                    %% n) + 1
-
   return(lat_sq)
 }
 

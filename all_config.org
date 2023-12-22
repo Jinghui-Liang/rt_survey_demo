@@ -241,11 +241,9 @@ set.seed (666) ## since it would be sourced by other scripts it should be reprod
 ## Method to generate a Latin-Square
 
 latin_template <- function(n){
-
   lat_sq <- array (rep (seq_len (n), each = n), c (n, n))
   lat_sq <- apply (lat_sq - 1, 2, function (x) (x + 0:(n-1)) 
                    %% n) + 1
-
   return(lat_sq)
 }
 
@@ -293,21 +291,15 @@ DBI::dbWriteTable (con_t, "order_list", o.record, overwrite = TRUE)
 DBI::dbWriteTable (con_t, "frequency_counter", f.record, overwrite = TRUE)
 DBI::dbWriteTable (con_t, "order_match", match.record, overwrite = TRUE)
 
-query <- paste ("ALTER TABLE", "order_match", "MODIFY order_label VARCHAR(999)", sep = " ")
+query <- "ALTER TABLE order_match MODIFY order_label VARCHAR(999)"
 
 rs <- DBI::dbSendStatement (con_t, query)
 DBI::dbClearResult (rs)
 
-query <- paste ("ALTER TABLE", "order_match", "MODIFY p_id VARCHAR(999)", sep = " ")
+query <- "ALTER TABLE order_match MODIFY p_id VARCHAR(999)"
 
 rs <- DBI::dbSendStatement (con_t, query)
 DBI::dbClearResult (rs)
-
-## query <- paste ("CREATE OR REPLACE TABLE", "demo", "(
-##     p_id VARCHAR(999),
-##     age VARCHAR (999), 
-##     gender VARCHAR(999) 
-##     )")
 
 query <- "CREATE OR REPLACE TABLE demo (
                                         p_id VARCHAR(999),
@@ -910,14 +902,24 @@ DBI::dbDisconnect (con)
 
 *** Checkresponse
 Run the following code in terminal (or command prompt on Windows), type the length of the questionnaire to check the corresponding tables (e.g., if your questionnaire is 6-item long, type =Rscript R/check_response.R 6=). Actually the only table we need to focus is =que_rd_test_n= but it's sometimes useful to see the other record.
-#+begin_src R :tangle R/check_response.R
-prompt_position <- "Are you running local test or uploading your platform to a server? (local/server)"
-prompt_conf <- "Do you want R to read .env file to get data or manually setting the config (only more than 1 survey are conducted)? (env/man)"
+#+begin_src R :tangle R/download_rawdat.R
+if(!interactive()) {
+  prompt_position <- "Are you running local test or uploading your platform to a server? (local/server)"
+  cat (prompt_position)
+  position <- readLines("stdin", n = 1)
 
-cat(prompt_position)
-position <- readLines("stdin", n = 1)
+  ## ------ under development ------
+  prompt_questionnaire <- "Which database you would like to down data from?" 
+  ## ------
 
-readRenviron(".env")
+  prompt_verbose <- "Do you want to download (f)ull data or just (r)esposne data? (f/r)"
+  cat (prompt_verbose)
+  verbose <- readLines("stdin", n = 1)
+  readRenviron("./.env")
+} else {
+  localdb <- "fullScale"
+  readRenviron("../.env")
+}
 
 if (position == "local") {
   env_server <- '127.0.0.1'
@@ -927,28 +929,48 @@ if (position == "local") {
   stop ('arguments must be either "local" or "server"')
 }
 
-library(DBI)
-library(tidyverse)
+try ({
+  con_t <- DBI::dbConnect(
+                  RMariaDB::MariaDB(),
+                  host = env_server,
+                  port = Sys.getenv('SQL_PORT'),
+                  user = Sys.getenv('USR_NAME'),
+                  password = Sys.getenv('DB_PASS'),
+                  dbname = localdb)
+  },
+  error = stop (".env file not correctly confifgured.")
+)
 
-con_t <- DBI::dbConnect(
-                RMariaDB::MariaDB(),
-                host = env_server,
-                port = Sys.getenv('SQL_PORT'),
-                user = Sys.getenv('USR_NAME'),
-                password = Sys.getenv('DB_PASS'),
-                dbname = Sys.getenv('SERVER_DB_NAME'))
 
-response <- tbl (con_t, "response") %>% collect()
-frequency <- tbl (con_t, "frequency_counter") %>% collect ()
-order <- tbl (con_t, "order_list") %>% collect ()
-match <- tbl (con_t, "order_match") %>% collect ()
+response <- tbl (con_t, "response") |> dplyr::collect ()
+demo <- tbl (con_t, "demo") |> dplyr::collect () |> 
+  dplyr::mutate (property = substr (property, 2, nchar(property) - 1)) |> 
+  tidyr::pivot_wider(names_from = property,
+                     values_from = value)
+frequency <- tbl (con_t, "frequency_counter") |> dplyr::collect ()
+order <- tbl (con_t, "order_list") |> dplyr::collect ()
+match <- tbl (con_t, "order_match") |> dplyr::collect ()
 
-dbDisconnect(con_t)
-head (response)
-head (frequency)
-head (order)
-head (match)
+if (!interactive()) {
+  dir_name <- paste0("./raw_data/results-", Sys.Date(), "-", format(Sys.time(), "%X"))
+} else {
+  dir_name <- paste0("../raw_data/results-", Sys.Date(), "-", format(Sys.time(), "%X"))
+}
 
+dir.create(dir_name)
+
+if (verbose == "f") {
+  write.csv (demo, file = paste0(dir_name, "/demo.csv"))
+  write.csv (order, file = paste0(dir_name, "/order-list.csv"))
+  write.csv (match, file = paste0(dir_name, "/order-pid.csv"))
+  write.csv (frequency, file = paste0(dir_name, "/frequency-counter.csv"))
+} else if (verbose != "r") {
+  stop ("target data number not properly specified.")
+}
+
+write.csv (response, file = paste0(dir_name, "/response.csv"))
+
+DBI::dbDisconnect(con_t)
 #+end_src
 
 * Citation

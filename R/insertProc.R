@@ -12,8 +12,6 @@ query_response <- "CREATE OR REPLACE PROCEDURE insertLikertResp(IN json VARCHAR(
       JSON_EXTRACT(json, '$.internal_node_id')
    )"
 
-
-
 query_demo <- "CREATE OR REPLACE PROCEDURE insertDemo(IN json VARCHAR(9999))
     INSERT INTO demo (p_id, value, property)
     VALUES(
