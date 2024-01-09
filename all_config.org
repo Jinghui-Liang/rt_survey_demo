@@ -17,11 +17,18 @@ COMPOSE_PROJECT=platform
 
 Since we have =.env= file, docker-compose will read the environment variables automatically.
 
-*** Dockerfile
+*** COMMENT Dockerfile
 
 #+begin_src text :tangle server.Dockerfile
-FROM php:8.1.1-apache
-RUN docker-php-ext-install mysqli pdo pdo_mysql
+  FROM php:8.1.1-apache
+  RUN docker-php-ext-install mysqli pdo pdo_mysql
+  RUN apt-get update && \
+      apt-get install -y \
+	r-base \
+	libcurl4-openssl-dev \
+	libssl-dev
+
+  RUN R -e "install.packages(c('tidyverse', 'DBI', 'jsonlite'), repos='https://cran.rstudio.com/')"
 #+end_src
 
 *** Docker-compose
@@ -116,65 +123,65 @@ cat("Initialization done")
 *** R Scale generator
 
 #+begin_src R :tangle ./R/make_scale.R
-if (interactive()) {
-  dat <- tibble::as_tibble (read.csv ('../scalepool/fullScale.csv',
-                                      header = TRUE,
-                                      na.strings = "",
-                                      fill = FALSE
-                                      ))
-} else {
-  dat <- tibble::as_tibble (read.csv (paste0 ("./scalepool/", quest_name),
-                                      header = TRUE,
-                                      fill = FALSE,
-                                      na.strings = ""))
-}
-
-# split out questionnaire part
-quest <- dat[, c("question", "q_choices", "q_required")] |> 
-  dplyr::filter(!is.na(question)) |> tibble::as_tibble()
-colnames(quest)[colnames(quest) == "question"] <- "prompt"
-colnames(quest)[colnames(quest) == "q_choices"] <- "choices"
-
-if (any(quest$q_required != "y" & quest$q_required != "n")) {
-  print (quest$q_required)
-  stop ("Column q_required not properly defined.")
-}
-
-if (!is.na(quest$choices[1])) {
-  if (sum (is.na(quest$choices)) == 0) {
-    quest_js <- quest |>
-      dplyr::mutate (choices = purrr::map(quest$choices,
-                                   \(.x) unlist (strsplit(.x, split = "/"))))
-  } else if (sum (is.na(quest$choices)) == length (quest$choices) - 1) {
-    quest_js <- quest |> 
-      dplyr::mutate (choices = strsplit(quest$choices[1], split = "/"))
+  if (interactive()) {
+    dat <- tibble::as_tibble (read.csv ('../scalepool/fullScale.csv',
+					header = TRUE,
+					na.strings = "",
+					fill = FALSE
+					))
   } else {
-    stop ('Column "q_choices" not properly defined.')
+    dat <- tibble::as_tibble (read.csv (paste0 ("./scalepool/", quest_name),
+					header = TRUE,
+					fill = FALSE,
+					na.strings = ""))
   }
-}
 
-scaleJSON <- jsonlite::toJSON(quest_js, pretty = TRUE)
+  # split out questionnaire part
+  quest <- dat[, c("question", "q_choices", "q_required")] |> 
+    dplyr::filter(!is.na(question)) |> tibble::as_tibble()
+  colnames(quest)[colnames(quest) == "question"] <- "prompt"
+  colnames(quest)[colnames(quest) == "q_choices"] <- "choices"
 
-# split out demographic part
-demo <- dat[, c("demo_var", "d_question", "d_choices", "d_required")] |> 
-  dplyr::filter(demo_var != "NA")
-colnames(demo)[colnames(demo) == "d_question"] <- "prompt"
-colnames(demo)[colnames(demo) == "d_choices"] <- "choices"
+  if (any(quest$q_required != "y" & quest$q_required != "n")) {
+    print (quest$q_required)
+    stop ("Column q_required not properly defined.")
+  }
 
-demo_strvar <- demo |> 
-  dplyr::filter (is.na(demo$choices)) |> 
-  dplyr::mutate (choices = list (NA))
+  if (!is.na(quest$choices[1])) {
+    if (sum (is.na(quest$choices)) == 0) {
+      quest_js <- quest |>
+	dplyr::mutate (choices = purrr::map(quest$choices,
+				     \(.x) unlist (strsplit(.x, split = "/"))))
+    } else if (sum (is.na(quest$choices)) == length (quest$choices) - 1) {
+      quest_js <- quest |> 
+	dplyr::mutate (choices = strsplit(quest$choices[1], split = "/"))
+    } else {
+      stop ('Column "q_choices" not properly defined.')
+    }
+  }
 
-demo_catvar <- demo |> 
-  dplyr::filter (!is.na(choices)) |> 
-  dplyr::mutate (choices = purrr::map(choices,
-                                       \(.x) unlist (strsplit(.x, split = "/"))))
-demo_js <- dplyr::bind_rows(demo_strvar, demo_catvar)
-demoJSON <- jsonlite::toJSON(demo_js, pretty = TRUE)
+  scaleJSON <- jsonlite::toJSON(quest_js, pretty = TRUE)
+
+  # split out demographic part
+  demo <- dat[, c("demo_var", "d_question", "d_choices", "d_required")] |> 
+    dplyr::filter(demo_var != "NA")
+  colnames(demo)[colnames(demo) == "d_question"] <- "prompt"
+  colnames(demo)[colnames(demo) == "d_choices"] <- "choices"
+
+  demo_strvar <- demo |> 
+    dplyr::filter (is.na(demo$choices)) |> 
+    dplyr::mutate (choices = list (NA))
+
+  demo_catvar <- demo |> 
+    dplyr::filter (!is.na(choices)) |> 
+    dplyr::mutate (choices = purrr::map(choices,
+					 \(.x) unlist (strsplit(.x, split = "/"))))
+  demo_js <- dplyr::bind_rows(demo_strvar, demo_catvar)
+  demoJSON <- jsonlite::toJSON(demo_js, pretty = TRUE)
 
 
-write(scaleJSON, "./server/www/scale.json")
-write(demoJSON, "./server/www/demo.json")
+  write(scaleJSON, "./server/www/scale.json")
+  write(demoJSON, "./server/www/demo.json")
 #+end_src
 
 #+RESULTS:
