@@ -33,7 +33,7 @@ try ({
                   password = Sys.getenv('DB_PASS'),
                   dbname = localdb)
   },
-  error = stop (".env file not correctly confifgured.")
+  error = stop (".env file not correctly configured.")
 )
 
 

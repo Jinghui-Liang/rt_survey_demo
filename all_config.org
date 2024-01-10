@@ -17,18 +17,18 @@ COMPOSE_PROJECT=platform
 
 Since we have =.env= file, docker-compose will read the environment variables automatically.
 
-*** COMMENT Dockerfile
+*** Dockerfile
 
 #+begin_src text :tangle server.Dockerfile
   FROM php:8.1.1-apache
   RUN docker-php-ext-install mysqli pdo pdo_mysql
   RUN apt-get update && \
       apt-get install -y \
-	r-base \
-	libcurl4-openssl-dev \
-	libssl-dev
+	nodejs \
+	r-base
 
-  RUN R -e "install.packages(c('tidyverse', 'DBI', 'jsonlite'), repos='https://cran.rstudio.com/')"
+ RUN R -e "install.packages(c('tidyverse', 'DBI', ‘jsonlite’), repos='https://cran.rstudio.com/')"
+
 #+end_src
 
 *** Docker-compose
@@ -38,6 +38,7 @@ version: '3.1'
 
 services:
   php:
+    container_name: survey_php
     build:
       context: .
       dockerfile: server.Dockerfile
@@ -46,10 +47,15 @@ services:
     restart: always
     volumes:
       - ./server/www:/var/www/html/
+      - ./R:/var/R
+      - ./scalepool:/var/scalepool
+      - ./ConfigDB:/var/ConfigDB
+      - ./.env:/var/.env
     networks:
       - testnet
   db:
     image: mariadb:${MARIADB_VER}
+    container_name: survey_db
     ports:
       - ${SQL_PORT}:3306
     restart: always
@@ -945,7 +951,7 @@ try ({
                   password = Sys.getenv('DB_PASS'),
                   dbname = localdb)
   },
-  error = stop (".env file not correctly confifgured.")
+  error = stop (".env file not correctly configured.")
 )
 
 

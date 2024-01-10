@@ -2,6 +2,7 @@ version: '3.1'
 
 services:
   php:
+    container_name: survey_php
     build:
       context: .
       dockerfile: server.Dockerfile
@@ -10,10 +11,14 @@ services:
     restart: always
     volumes:
       - ./server/www:/var/www/html/
+      - ./R:/var/R
+      - ./scalepool:/var/scalepool
+      - ./ConfigDB:/var/ConfigDB
     networks:
       - testnet
   db:
     image: mariadb:${MARIADB_VER}
+    container_name: survey_db
     ports:
       - ${SQL_PORT}:3306
     restart: always
