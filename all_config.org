@@ -22,11 +22,20 @@ Since we have =.env= file, docker-compose will read the environment variables au
 #+begin_src text :tangle server.Dockerfile
   FROM php:8.2-apache
   RUN docker-php-ext-install mysqli pdo pdo_mysql
+  RUN apt-get update && apt-get install -y locales && rm -rf /var/lib/apt/lists/* \
+   && locale-gen "en_US.UTF-8"
+  ENV LANG=en_US.UTF-8 \
+    LANGUAGE=en_US:en
+
   RUN apt-get update && \
       apt-get install -y \
-	nodejs
-  RUN apt install r-base -y
+	nodejs \
+	r-base \
+	libmariadb-dev
 
+  RUN R -e "install.packages(c('tidyverse', 'DBI', 'jsonlite', 'RMariaDB'), repos='https://cran.rstudio.com/')"
+
+  ENV LC_ALL=C.UTF-8
 #+end_src
 
 *** Docker-compose
@@ -48,7 +57,7 @@ services:
       - ./R:/var/R
       - ./scalepool:/var/scalepool
       - ./ConfigDB:/var/ConfigDB
-      - ./.env:/var/.env
+      - ./.env:/var/server.env
     networks:
       - testnet
   db:
@@ -78,69 +87,79 @@ You might already have corresponding database set up on a server. However if you
 
 #+begin_src R :shebang "#!/usr/bin/env Rscript" :tangle-mode (identity #o755) :tangle ConfigDB
 
-prompt1 <- "Are you running local test or uploading your platform to a server? (local/server) "
-prompt2 <- "The name of target questionnaire you would like to use, extension required: "
+  prompt1 <- "Are you running local test or uploading your platform to a server? (local/server) "
+  prompt2 <- "The name of target questionnaire you would like to use, extension required: "
 
-cat(prompt1)
-position <- readLines("stdin", n = 1)
+  cat(prompt1)
+  position <- readLines("stdin", n = 1)
 
-cat (prompt2)
-quest_name <- readLines("stdin", n = 1)
+  cat (prompt2)
+  quest_name <- readLines("stdin", n = 1)
 
-source ("R/make_scale.R")
+  source ("R/make_scale.R")
 
-cat ("Questionnaire has parsed and saved to `www` \n")
+  cat ("Questionnaire has parsed and saved to `www` \n")
 
-qlen <- nrow (quest)
-cat ("Reading evnironment configuration... \n")
+  qlen <- nrow (quest)
+  cat ("Reading evnironment configuration... \n")
 
-readRenviron(".env")
+  if (file.exists("/.dockerenv")) {
+    readRenviron("server.env")
+  } else {
+    readRenviron(".env")
+  }
+  env_port <- Sys.getenv('SQL_PORT')
+  env_password <- Sys.getenv('DB_PASS')
+  env_usr <- Sys.getenv('USR_NAME')
+  env_quest <- quest_name
 
-env_port <- Sys.getenv('SQL_PORT')
-env_password <- Sys.getenv('DB_PASS')
-env_usr <- Sys.getenv('USR_NAME')
-env_quest <- quest_name
+  cat ("Arguments accepted, inatialising ...... \n")
 
-cat ("Arguments accepted, inatialising ...... \n")
+  if (position == "local") {
+    sql_dbname <- tools::file_path_sans_ext (quest_name)
+    if (file.exists ("/.dockerenv")) {
+      env_server <- "host.docker.internal"
+    } else {
+      env_server <- "127.0.0.1"
+    }
+    source ("R/init_db.R")
+  } else if (position == "server") {
+    env_server <- Sys.getenv('SERVER_NAME')
+    sql_dbname <- Sys.getenv('SERVER_DB_NAME')
+  } else {
+    stop ('arguments must be either "local" or "server"')
+  }
+  source ("R/init_table.R")
+  source ("R/init_trial.R")
+  source ("R/insertProc.R")
+  source ("R/db_conf.R")
 
-if (position == "local") {
-  env_dbname <- Sys.getenv('IMG_NAME')
-  sql_dbname <- tools::file_path_sans_ext (quest_name)
-  env_server <- "127.0.0.1"
-  source ("R/init_db.R")
-} else if (position == "server") {
-  env_server <- Sys.getenv('SERVER_NAME')
-  env_dbname <- Sys.getenv('SERVER_DB_NAME')
-} else {
-  stop ('arguments must be either "local" or "server"')
-}
-
-source ("R/init_table.R")
-source ("R/init_trial.R")
-source ("R/insertProc.R")
-source ("R/db_conf.R")
-
-cat("Initialization done")
+  cat("Initialization done")
 
 #+end_src
 
 *** R Scale generator
 
 #+begin_src R :tangle ./R/make_scale.R
-  if (interactive()) {
-    dat <- tibble::as_tibble (read.csv ('../scalepool/fullScale.csv',
-					header = TRUE,
-					na.strings = "",
-					fill = FALSE
-					))
+  if (file.exists ("/.dockerenv")) {
+    questPath <- paste0("/var/scalepool/", quest_name)
+    outputDir <- "/var/www/html/"
   } else {
-    dat <- tibble::as_tibble (read.csv (paste0 ("./scalepool/", quest_name),
-					header = TRUE,
-					fill = FALSE,
-					na.strings = ""))
+    if (interactive()) {
+      questPath <- "../scalepool/fullScale.csv"
+    } else {
+      questPath <- paste0("./scalepool/", quest_name)
+    }
+    outputDir <- "./server/www/"
   }
 
-  # split out questionnaire part
+  dat <- tibble::as_tibble (read.csv (questPath,
+				      header = TRUE,
+				      na.strings = "",
+				      fill = FALSE
+				      ))
+
+  ## split out questionnaire part
   quest <- dat[, c("question", "q_choices", "q_required")] |> 
     dplyr::filter(!is.na(question)) |> tibble::as_tibble()
   colnames(quest)[colnames(quest) == "question"] <- "prompt"
@@ -155,7 +174,7 @@ cat("Initialization done")
     if (sum (is.na(quest$choices)) == 0) {
       quest_js <- quest |>
 	dplyr::mutate (choices = purrr::map(quest$choices,
-				     \(.x) unlist (strsplit(.x, split = "/"))))
+					    \(.x) unlist (strsplit(.x, split = "/"))))
     } else if (sum (is.na(quest$choices)) == length (quest$choices) - 1) {
       quest_js <- quest |> 
 	dplyr::mutate (choices = strsplit(quest$choices[1], split = "/"))
@@ -166,7 +185,7 @@ cat("Initialization done")
 
   scaleJSON <- jsonlite::toJSON(quest_js, pretty = TRUE)
 
-  # split out demographic part
+					  # split out demographic part
   demo <- dat[, c("demo_var", "d_question", "d_choices", "d_required")] |> 
     dplyr::filter(demo_var != "NA")
   colnames(demo)[colnames(demo) == "d_question"] <- "prompt"
@@ -179,13 +198,13 @@ cat("Initialization done")
   demo_catvar <- demo |> 
     dplyr::filter (!is.na(choices)) |> 
     dplyr::mutate (choices = purrr::map(choices,
-					 \(.x) unlist (strsplit(.x, split = "/"))))
+					\(.x) unlist (strsplit(.x, split = "/"))))
   demo_js <- dplyr::bind_rows(demo_strvar, demo_catvar)
   demoJSON <- jsonlite::toJSON(demo_js, pretty = TRUE)
 
 
-  write(scaleJSON, "./server/www/scale.json")
-  write(demoJSON, "./server/www/demo.json")
+  write(scaleJSON, paste0(outputDir, "scale.json"))
+  write(demoJSON, paste0(outputDir, "demo.json"))
 #+end_src
 
 #+RESULTS:
@@ -194,102 +213,100 @@ cat("Initialization done")
 
 If you are testing on your local machine you need to manually set up the database.
 #+begin_src R :tangle R/init_db.R :mkdirp yes
+  con <- DBI::dbConnect(
+		RMariaDB::MariaDB(),
+		host = env_server,
+		port = env_port,
+		user = env_usr,
+		password = env_password)
+  
+  stmt_db <- paste ('CREATE DATABASE IF NOT EXISTS', sql_dbname)
 
-con <- DBI::dbConnect(
-              RMariaDB::MariaDB(),
-              host = env_server,
-              port = env_port,
-              user = env_usr,
-              password = env_password)
+  rs <- DBI::dbSendStatement(con, stmt_db)
+  DBI::dbClearResult (rs)
+  DBI::dbDisconnect(con)
 
-stmt_db <- paste ('CREATE DATABASE IF NOT EXISTS', sql_dbname)
-
-rs <- DBI::dbSendStatement(con, stmt_db)
-DBI::dbClearResult (rs)
-DBI::dbDisconnect(con)
-
-cat ("database generated successfully \n")
+  cat ("database generated successfully \n")
 #+end_src
 
 *** Tables for storing data and recording id-order pairs
 
 **** Create table for response data and send it to mysql.
 #+begin_src R :tangle R/init_table.R :mkdirp yes
-con_t <- DBI::dbConnect(
-                RMariaDB::MariaDB(),
-                host = env_server,
-                port = env_port,
-                user = env_usr,
-                password = env_password,
-                dbname = sql_dbname)
+  con_t <- DBI::dbConnect(
+		  RMariaDB::MariaDB(),
+		  host = env_server,
+		  port = env_port,
+		  user = env_usr,
+		  password = env_password,
+		  dbname = sql_dbname)
 
-query <- "CREATE OR REPLACE TABLE response (
-      p_id VARCHAR(999), 
-      rt VARCHAR(999), 
-      response VARCHAR(999), 
-      Q_num VARCHAR(999), 
-      trial_type VARCHAR(999), 
-      trial_index VARCHAR(999), 
-      order_index VARCHAR(999),
-      time_elapsed VARCHAR(999), 
-      internal_node_id VARCHAR(999)
-      )"
+  query <- "CREATE OR REPLACE TABLE response (
+	p_id VARCHAR(999), 
+	rt VARCHAR(999), 
+	response VARCHAR(999), 
+	Q_num VARCHAR(999), 
+	trial_type VARCHAR(999), 
+	trial_index VARCHAR(999), 
+	order_index VARCHAR(999),
+	time_elapsed VARCHAR(999), 
+	internal_node_id VARCHAR(999)
+	)"
 
-rs <- DBI::dbSendQuery(con_t, query)
-DBI::dbClearResult (rs)
+  rs <- DBI::dbSendQuery(con_t, query)
+  DBI::dbClearResult (rs)
 
-cat ("response table generated successfully \n")
+  cat ("response table generated successfully \n")
 #+end_src
 
 **** Create table for recording presentation order in R.
 
 #+begin_src R :results silent :tangle R/generate_order.R
-cat ("reading generate_order.R")
-options (tidyverse.quiet = TRUE)
-library (tidyverse)
-set.seed (666) ## since it would be sourced by other scripts it should be reproducible.
+  cat ("reading generate_order.R")
 
-## Method to generate a Latin-Square
+  set.seed (666) ## since it would be sourced by other scripts it should be reproducible.
 
-latin_template <- function(n){
-  lat_sq <- array (rep (seq_len (n), each = n), c (n, n))
-  lat_sq <- apply (lat_sq - 1, 2, function (x) (x + 0:(n-1)) 
-                   %% n) + 1
-  return(lat_sq)
-}
+  ## Method to generate a Latin-Square
 
-## Generate a table including all the presentation order we want, and make it suitable for JavaScript.
-p_order_table <- function (qlen, rd.size = qlen) {
-  if (isTRUE (rd.size >= factorial(qlen))) {
-    stop ("number of expected randomzied order exceeded the maximum possible arrangments")
-  } else {
-    fx <- as_tibble (t ((1 : qlen)))
-    ls <- as_tibble (latin_template (qlen))
-    rd <- as_tibble (t (replicate (rd.size, sample (1: qlen, qlen, FALSE), TRUE)))
-
-    ls_label <- paste0 (rep ("ls", length (ls)), 1:length (ls))
-    rd_label <- paste0 (rep ("rd", rd.size), 1: rd.size)
-    order_label <- c ("fx", ls_label, rd_label)
-    position_label <- paste0 ("p", 1: qlen)
-
-    dat <- (bind_rows (fx, ls) %>% bind_rows (rd) - 1)
-
-    order_table <- tibble (order_label = order_label) %>% bind_cols (dat)
-    colnames (order_table) [2: (qlen + 1)] <- position_label
-    return (order_table)
+  latin_template <- function(n){
+    lat_sq <- array (rep (seq_len (n), each = n), c (n, n))
+    lat_sq <- apply (lat_sq - 1, 2, function (x) (x + 0:(n-1)) 
+		     %% n) + 1
+    return(lat_sq)
   }
-}
 
-o.record <- p_order_table (qlen)
+  ## Generate a table including all the presentation order we want, and make it suitable for JavaScript.
+  p_order_table <- function (qlen, rd.size = qlen) {
+    if (isTRUE (rd.size >= factorial(qlen))) {
+      stop ("number of expected randomzied order exceeded the maximum possible arrangments")
+    } else {
+      fx <- tibble::as_tibble (t ((1 : qlen)))
+      ls <- tibble::as_tibble (latin_template (qlen))
+      rd <- tibble::as_tibble (t (replicate (rd.size, sample (1: qlen, qlen, FALSE), TRUE)))
 
-f.record <- tibble (
-  order_label = o.record$order_label,
-  n = rep (0)
-)
+      ls_label <- paste0 (rep ("ls", length (ls)), 1:length (ls))
+      rd_label <- paste0 (rep ("rd", rd.size), 1: rd.size)
+      order_label <- c ("fx", ls_label, rd_label)
+      position_label <- paste0 ("p", 1: qlen)
 
-match.record <- tibble (p_id = "0",
-                        order_label = "0")
-match.record <- match.record[-1, ]
+      dat <- (dplyr::bind_rows (fx, ls) |> dplyr::bind_rows (rd) - 1)
+
+      order_table <- tibble::tibble (order_label = order_label) |> dplyr::bind_cols (dat)
+      colnames (order_table) [2: (qlen + 1)] <- position_label
+      return (order_table)
+    }
+  }
+
+  o.record <- p_order_table (qlen)
+
+  f.record <- tibble::tibble (
+    order_label = o.record$order_label,
+    n = rep (0)
+  )
+
+  match.record <- tibble::tibble (p_id = "0",
+			  order_label = "0")
+  match.record <- match.record[-1, ]
 
 #+end_src
 
@@ -365,10 +382,14 @@ DBI::dbDisconnect(con_t)
 **** Mariadb config
 
 #+begin_src R :results silent :tangle R/db_conf.R
-template <- "[database]\ndriver = mysql\nhost = %s\nport = %s\ndbname = %s\nusername = %s\npassword = %s"
-conf <- sprintf(template, "db", env_port, sql_dbname, env_usr, env_password)
+  template <- "[database]\ndriver = mysql\nhost = %s\nport = %s\ndbname = %s\nusername = %s\npassword = %s"
+  conf <- sprintf(template, "db", env_port, sql_dbname, env_usr, env_password)
 
-writeLines(conf, 'server/www/private/conf.ini')
+  if (file.exists("/.dockerenv")) {
+    writeLines(conf, '/var/www/html/private/conf.ini')
+    } else {
+  writeLines(conf, 'server/www/private/conf.ini')
+  }
 #+end_src
 
 **** PHP connection class

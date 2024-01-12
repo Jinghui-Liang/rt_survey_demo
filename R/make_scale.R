@@ -1,17 +1,22 @@
-if (interactive()) {
-  dat <- tibble::as_tibble (read.csv ('../scalepool/fullScale.csv',
-                                      header = TRUE,
-                                      na.strings = "",
-                                      fill = FALSE
-                                      ))
+if (file.exists ("/.dockerenv")) {
+  questPath <- paste0("/var/scalepool/", quest_name)
+  outputDir <- "/var/www/html/"
 } else {
-  dat <- tibble::as_tibble (read.csv (paste0 ("./scalepool/", quest_name),
-                                      header = TRUE,
-                                      fill = FALSE,
-                                      na.strings = ""))
+  if (interactive()) {
+    questPath <- "../scalepool/fullScale.csv"
+  } else {
+    questPath <- paste0("./scalepool/", quest_name)
+  }
+  outputDir <- "./server/www/"
 }
 
-# split out questionnaire part
+dat <- tibble::as_tibble (read.csv (questPath,
+				    header = TRUE,
+				    na.strings = "",
+				    fill = FALSE
+				    ))
+
+## split out questionnaire part
 quest <- dat[, c("question", "q_choices", "q_required")] |> 
   dplyr::filter(!is.na(question)) |> tibble::as_tibble()
 colnames(quest)[colnames(quest) == "question"] <- "prompt"
@@ -26,7 +31,7 @@ if (!is.na(quest$choices[1])) {
   if (sum (is.na(quest$choices)) == 0) {
     quest_js <- quest |>
       dplyr::mutate (choices = purrr::map(quest$choices,
-                                   \(.x) unlist (strsplit(.x, split = "/"))))
+					  \(.x) unlist (strsplit(.x, split = "/"))))
   } else if (sum (is.na(quest$choices)) == length (quest$choices) - 1) {
     quest_js <- quest |> 
       dplyr::mutate (choices = strsplit(quest$choices[1], split = "/"))
@@ -37,7 +42,7 @@ if (!is.na(quest$choices[1])) {
 
 scaleJSON <- jsonlite::toJSON(quest_js, pretty = TRUE)
 
-# split out demographic part
+					# split out demographic part
 demo <- dat[, c("demo_var", "d_question", "d_choices", "d_required")] |> 
   dplyr::filter(demo_var != "NA")
 colnames(demo)[colnames(demo) == "d_question"] <- "prompt"
@@ -50,10 +55,10 @@ demo_strvar <- demo |>
 demo_catvar <- demo |> 
   dplyr::filter (!is.na(choices)) |> 
   dplyr::mutate (choices = purrr::map(choices,
-                                       \(.x) unlist (strsplit(.x, split = "/"))))
+				      \(.x) unlist (strsplit(.x, split = "/"))))
 demo_js <- dplyr::bind_rows(demo_strvar, demo_catvar)
 demoJSON <- jsonlite::toJSON(demo_js, pretty = TRUE)
 
 
-write(scaleJSON, "./server/www/scale.json")
-write(demoJSON, "./server/www/demo.json")
+write(scaleJSON, paste0(outputDir, "scale.json"))
+write(demoJSON, paste0(outputDir, "demo.json"))

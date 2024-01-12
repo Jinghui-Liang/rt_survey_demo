@@ -1,27 +1,17 @@
 [
   {
-    "prompt": "I am the life of the party.",
-    "choices": ["Very Inaccurate", "Moderately\nInaccurate", "Very\nAccurate"],
+    "prompt": "这个报告太长了",
+    "choices": ["非常不同意", "不同意", "不置可否", "同意", "非常同意"],
     "q_required": "y"
   },
   {
-    "prompt": "I feel little concern for others",
-    "choices": ["Very Inaccurate", "Moderately\nInaccurate", "Very\nAccurate"],
+    "prompt": "这个平台挺好用的",
+    "choices": ["非常不同意", "不同意", "不置可否", "同意", "非常同意"],
     "q_required": "y"
   },
   {
-    "prompt": "I am always prepared.",
-    "choices": ["Very Inaccurate", "Moderately\nInaccurate", "Very\nAccurate"],
-    "q_required": "n"
-  },
-  {
-    "prompt": "I get stressed out easily.",
-    "choices": ["Very Inaccurate", "Moderately\nInaccurate", "Very\nAccurate"],
+    "prompt": "我现在感觉到快乐",
+    "choices": ["非常不同意", "不同意", "不置可否", "同意", "非常同意"],
     "q_required": "y"
-  },
-  {
-    "prompt": "I have a rich vocabulary.",
-    "choices": ["Very Inaccurate", "Moderately\nInaccurate", "Very\nAccurate"],
-    "q_required": "n"
   }
 ]

@@ -6,7 +6,7 @@ Reaction time (RT) for items in psychometric questionnaires reflect participants
 
 ** Installation and dependencies
 
-Before using this platform, you will need these dependencies in your local machine:
+**Latest Update**: Users can only install docker on local machine and no other dependencies should be needed. Our new configuration should work well in a plain environment. However, if users would like to edit any code outside the container, they should have the following dependencies installed:
 
 - Node.js
 - Apache
@@ -50,14 +50,15 @@ cd /path/to/rt_survey_demo
 - Then, type
 
 #+begin_src shell
-docker-compose up -d --build
+    docker-compose up -d --build
 
-# after you notice you can type again
+  # after you notice you can type again
+    docker exec -it survey_php sh
+    cd /var
+    ./ConfigDB
 
-./ConfigDB
-
-Are you running local test or uploading your platform to a server? (local/server) local
-The name of target questionnaire you would like to use, extension required: fullScale.csv
+    Are you running local test or uploading your platform to a server? (local/server) local
+    The name of target questionnaire you would like to use, extension required: fullScale.csv
 #+end_src
 
 - When you see "Initialization done", go to your browser, type =127.0.0.1:8080=, you can see a well organized questionnaire is done.
@@ -71,7 +72,7 @@ Currently, this platform only accepts .csv format files. An example of this file
 | question                    | q_choices              | q_required | d_question                          | d_choices             | d_required |
 | Is today your lucky day?    | Disagree/Neutral/Agree | y          | How old are you?                    |                       | n          |
 | I feel so sad today.        |                        | n          | What's your educational background? | educated/not educated | n          |
-| Can tomorrow be better!     |                        | n          | What's your email address?          |                       | y          |
+| Tomorrow can be better      |                        | n          | What's your email address?          |                       | y          |
 
 This .csv file integrated questions and demography information together. To specify your survey, you should follow couple rules:
 
@@ -94,7 +95,7 @@ It's common that you would like to test everything before launching your survey.
 1. You don't have to change anything from =.env= unless you want to (descried below).
 2. Put =docker-compose up -d --build= to command line to activate the Docker container we papered for users.
 3. Prepare your questionnaire file in =.csv= format, and copy it to =./scalepool= directory.
-4. Back to the root directory (=rt_survey_demo= by default, but you can surely rename it), open the binary =ConfigDB=. Following the instruction, put =local= as your first argument to let =ConfigDB= know you are doing test. Press return, then type the name of your =.csv= questionnaire **WITH EXTENSION**. You can ignore "incomplete final line found" error which may appear during the execution.
+4. On your terminal put =docker exec -it survey_php sh= to get in the shell inside the container, =cd /var= then open the binary via =./ConfigDB=. Following the instruction, put =local= as your first argument to let =ConfigDB= know you are doing test. Press return, then type the name of your =.csv= questionnaire **WITH EXTENSION**. You can ignore "incomplete final line found" error which may appear during the execution.
 
 #+begin_src shell
 ./ConfigDB
@@ -106,20 +107,19 @@ The name of target questionnaire you would like to use, extension required: your
 5. When you see =Initialization done= display on your terminal, open your preferred browser and go to =localhost:8080= (MacOS/Linux) or =127.0.0.1:8080= (All operating system) to check if questionnaire are appropriate loaded.
 6. If you would like to manage your database:
    - **outside** the docker image: go to the terminal and type: =mysql -h 127.0.0.1 -u root -P ${SQL_PORT} -p= (where ${SQL_PORT} is 3306 by default), or
-   - =docker exec -it localMariaDB sh= to call the shell **inside docker**, then =mysql -h 127.0.0.1 -u root -P 3306 -p= to access MariaDB;
+   - =docker exec -it survey_db sh= to call the shell **inside docker**, then =mysql -h 127.0.0.1 -u root -P 3306 -p= to access MariaDB;
    - hit enter and type your password (you can see it from =.env=) or use preferred database management IDEs,
    - you will find a database with the same name as your questionnaire without extension.
 7. When finishing testing, don't forget putting =docker-compose down= on your terminal to save some memory.
 
 **** Change the default
 
-- Once =docker-compose up -d --build= is executed, two containers will be created based on =.env= settings. First, the =php2= container is used to connect to virtual MariaDB environment. While the =localMariaDB= is the virtual database container where your data (responses) will be stored into. To modify MariaDB container name, change =IMG_NAME= in =.env=
-- This container network (i.e., connection between =php2= and MariaDB) uses default port 3306. However, you can customize the "outside" port to your prefer ones to suit your case. For example, changing =SQL_PORT=3308= in =.env= allows you to connect to the database inside docker with terminal command =mysql -h 127.0.0.1 -u root -P 3308 -p=. But if you are assessing the database inside docker, the port will always be 3306. You can check which port is used by command =docker ps=.
+- Once =docker-compose up -d --build= is executed, two containers will be created based on =.env= settings. First, the =survey_php= container is used to connect to virtual MariaDB environment. While the =survey_db= is the virtual database container where your data (responses) will be stored into.
+- Connection between containers uses default port 3306. However, you can customize the "outside" port to your prefer ones to suit your case. For example, changing =SQL_PORT=3308= in =.env= allows you to connect to the database inside docker with terminal command =mysql -h 127.0.0.1 -u root -P 3308 -p=. But if you are assessing the database inside docker, the port will always be 3306. You can check which port is used by command =docker ps=.
 - When conducting local test with docker, variable =SERVER_DB_NAME= will be ignored because the MariaDB database name will always be your questionnaire name.
 - If you want to test different questionnaires with the same docker/connection configuration, please refer to [[What if I want to use another questionnaire?]] session. However, if you would like to change the external port, username or other connection settings, make sure do =docker-compose down= first, then modify and save =.env=, then execute =docker-compose up -d --build= again to verify your changes.
 
 *** Generate ready-to-use files
-
 
 For users who have prepared an online database and know its configuration, that can prepare their questionnaire file like described above. Then you can edit =.env= to match their network/database setting. Execute =./ConfigDB=, put =server= as your first argument and your questionnaire name *WITH EXTENSION* as the second one. Scripts will configure everything and send them to your online database. When you see =Initialization done= display on your terminal, that you want to access =./server/www=, and =www= folder is the wrapper you would like to submit to server.
 

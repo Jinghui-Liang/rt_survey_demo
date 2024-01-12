@@ -15,8 +15,11 @@ cat ("Questionnaire has parsed and saved to `www` \n")
 qlen <- nrow (quest)
 cat ("Reading evnironment configuration... \n")
 
-readRenviron(".env")
-
+if (file.exists("/.dockerenv")) {
+  readRenviron("server.env")
+} else {
+  readRenviron(".env")
+}
 env_port <- Sys.getenv('SQL_PORT')
 env_password <- Sys.getenv('DB_PASS')
 env_usr <- Sys.getenv('USR_NAME')
@@ -25,17 +28,19 @@ env_quest <- quest_name
 cat ("Arguments accepted, inatialising ...... \n")
 
 if (position == "local") {
-  env_dbname <- Sys.getenv('IMG_NAME')
   sql_dbname <- tools::file_path_sans_ext (quest_name)
-  env_server <- "127.0.0.1"
+  if (file.exists ("/.dockerenv")) {
+    env_server <- "host.docker.internal"
+  } else {
+    env_server <- "127.0.0.1"
+  }
   source ("R/init_db.R")
 } else if (position == "server") {
   env_server <- Sys.getenv('SERVER_NAME')
-  env_dbname <- Sys.getenv('SERVER_DB_NAME')
+  sql_dbname <- Sys.getenv('SERVER_DB_NAME')
 } else {
   stop ('arguments must be either "local" or "server"')
 }
-
 source ("R/init_table.R")
 source ("R/init_trial.R")
 source ("R/insertProc.R")

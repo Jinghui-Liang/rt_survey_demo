@@ -1,32 +1,14 @@
 [
   {
     "demo_var": "age",
-    "prompt": "How old are you?",
-    "choices": [null],
-    "d_required": "n"
-  },
-  {
-    "demo_var": "email",
-    "prompt": "What is your email address?",
+    "prompt": "请输入您的年龄",
     "choices": [null],
     "d_required": "y"
   },
   {
     "demo_var": "gender",
-    "prompt": "What is your gender",
-    "choices": ["male", "female"],
-    "d_required": "n"
-  },
-  {
-    "demo_var": "education",
-    "prompt": "What is your educational background?",
-    "choices": ["high school", "under graduate", "postgraduate"],
-    "d_required": "n"
-  },
-  {
-    "demo_var": "financial",
-    "prompt": "What is your financial case?",
-    "choices": ["low", "mid", "high"],
+    "prompt": "您的性别是？",
+    "choices": ["男", "女"],
     "d_required": "y"
   }
 ]

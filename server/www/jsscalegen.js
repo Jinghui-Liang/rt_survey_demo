@@ -35,7 +35,6 @@ function makeJsQuestion (questionArray, k) {
 makeJsQuestion (questionArray, k);
 
 let demoArray = await getScale('./demo.json');
-console.log(demoArray);
 var demos = [];
 let l;
 let m = demoArray.length;
