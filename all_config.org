@@ -2,7 +2,7 @@
 
 Below is the whole setup about this platform. You might found descriptions in /Create table for recording presentation order in R/ and /test-survey.js/ most useful if you want to change presentation orders or collect more details.
 
-** .env file
+** server.env file
 #+begin_src text :tangle .env :mkdirp yes
 HTTP_PORT=8080
 SQL_PORT=3306
