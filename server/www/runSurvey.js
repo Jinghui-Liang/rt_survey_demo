@@ -51,6 +51,8 @@ const postData = async (data, uri) => {
 
 // main function to receive presentation order and run the survey
 
+var order_str = [];
+
 let runSurvey = (data) => {
     if (data.length == 0) {
 	      document.write ('all presentation orders are fully assigned, please run "Rscript reset_counter.R" in terminal to run this survey again');
@@ -59,29 +61,36 @@ let runSurvey = (data) => {
         console.log(Object.values (data[0]));
         var order_label = Object.values (data[0]);
         var method = order_label[0];
-        let order = order_label.slice (1, order_label.length).map (x => x + 1);
+        // let order = order_label.slice (1, order_label.length).map (x => x + 1);
+	let order = order_label.slice(1);
+	// console.log(order.length);
         if (order.length < 10) {
-	          var order_str = order.map (i => "0" + i);
+	    // var order_str = order.map (i => "0" + i);
+	    // order_str = order.map (i => "0" + i);
+	    order_str = order;
         } else {
-            var order_str = [];
-	          for (let j = 0; j <= order.length - 1; j++) {
-	              let  element = order[j];
-                if (element.length == 1) {
-                    temp = "0" + element;
-                    order_str.push (temp);
-                } else {
-                    order_str.push (order[j]);
-                }
-	          }
+            // var order_str = [];
+	    // for (let j = 0; j <= order.length - 1; j++) {
+	    for (let j = 0; j < order.length; j++) {
+	        //       let  element = order[j];
+                // if (element.length == 1) {
+                //     // temp = "0" + element;
+		//     temp = element;
+                //     order_str.push (temp);
+                // } else {
+                //     order_str.push (order[j]);
+                // }
+		order_str.push (order[j]);
+	    }
         };
     };
 
-    // use async function to get presentation order from mysql
+    // get presentation order from mysql
     var jsPsych = initJsPsych({
         on_finish: function () {
 	          var p_id = jsPsych.randomization.randomID(4);
 	          jsPsych.data.addProperties({order_index: method,
-				                                p_id: p_id});
+				              p_id: p_id});
             let rawResult = jsPsych.data.get();
             console.log (rawResult);
             
@@ -131,14 +140,15 @@ let runSurvey = (data) => {
 	              order_label: method
 	          };
             postData (demo_data, 'postDemo.php');
-	          postData (match_data, 'postMatch.php');
-	          postData (trial_data, 'postData.php');
-	          console.log('data succesfully submitted');
+	    postData (match_data, 'postMatch.php');
+	    postData (trial_data, 'postData.php');
+	    console.log('data succesfully submitted');
         }
     });
 
     // ----------- Reorganize questions based on the given order. -------------
     var new_order = [];
+    console.log(order_str);
     var id = 0;
     for (let v = 0; v < order_str.length; v++) {
 	      while (trials[id].data.Q_num != order_str[v]) {

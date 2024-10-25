@@ -1,8 +1,28 @@
-﻿question,q_choices,q_required,demo_var,d_question,d_choices,d_required
+﻿question,choices,required,label,demographic
+What is your age?,,n,age,y
+What is your gender,male/female,n,gender,y
+What is your educational background?,high school/under graduate/postgraduate,n,education,y
+What is your email address?,,y,email,y
+What is your financial case?,low/mid/high,y,financial,y
 I am the life of the party.,"Very Inaccurate/Moderately
 Inaccurate/Very
-Accurate",y,age,你的年龄？,,n
-I feel little concern for others,,y,gender,What is your gender,male/female,n
-I am always prepared.,,n,education,What is your educational background?,high school/under graduate/postgraduate,n
-I get stressed out easily.,,y,email,What is your email address?,,y
-I have a rich vocabulary.,,n,financial,What is your financial case?,low/mid/high,y
+Accurate",y,E,
+I feel little concern for others.,,y,A,
+I am always prepared.,,n,C,
+I get stressed out easily.,,y,N,
+I have a rich vocabulary.,,n,O,
+I don't talk a lot.,,,E,
+I am interested in people.,,,A,
+I leave my belongings around.,,,C,
+I am relaxed most of the time.,,,N,
+I have difficulty understanding abstract ideas.,,,O,
+I feel comfortable around people.,,,E,
+I insult people.,,,A,
+I pay attention to details.,,,C,
+I worry about things.,,,N,
+I have a vivid imagination.,,,O,
+I keep in the background.,,,E,
+I sympathize with others' feelings.,,,A,
+I make a mess of things.,,,C,
+I seldom feel blue.,,,N,
+I am not interested in abstract ideas.,,,O,

@@ -1,45 +1,28 @@
-cat ("reading generate_order.R")
-
-set.seed (666) ## since it would be sourced by other scripts it should be reproducible.
-
-## Method to generate a Latin-Square
-
-latin_template <- function(n){
-  lat_sq <- array (rep (seq_len (n), each = n), c (n, n))
-  lat_sq <- apply (lat_sq - 1, 2, function (x) (x + 0:(n-1)) 
-		   %% n) + 1
-  return(lat_sq)
-}
-
-## Generate a table including all the presentation order we want, and make it suitable for JavaScript.
-p_order_table <- function (qlen, rd.size = qlen) {
-  if (isTRUE (rd.size >= factorial(qlen))) {
-    stop ("number of expected randomzied order exceeded the maximum possible arrangments")
-  } else {
-    fx <- tibble::as_tibble (t ((1 : qlen)))
-    ls <- tibble::as_tibble (latin_template (qlen))
-    rd <- tibble::as_tibble (t (replicate (rd.size, sample (1: qlen, qlen, FALSE), TRUE)))
-
-    ls_label <- paste0 (rep ("ls", length (ls)), 1:length (ls))
-    rd_label <- paste0 (rep ("rd", rd.size), 1: rd.size)
-    order_label <- c ("fx", ls_label, rd_label)
-    position_label <- paste0 ("p", 1: qlen)
-
-    dat <- (dplyr::bind_rows (fx, ls) |> dplyr::bind_rows (rd) - 1)
-
-    order_table <- tibble::tibble (order_label = order_label) |> dplyr::bind_cols (dat)
-    colnames (order_table) [2: (qlen + 1)] <- position_label
-    return (order_table)
+if (file.exists ("/.dockerenv")) {
+  arcPath <- "/var/scalepool/"
+  # outputDir <- "/var/scalepool"
+} else {
+  if(interactive()){
+    arcPath <- "../scalepool/"
+  }
+  else {
+    stop("no plan archive is detected.")
   }
 }
 
-o.record <- p_order_table (qlen)
+if(file.exists(paste0(arcPath, "df-order.zip"))){
+    unzip(paste0(arcPath, "df-order.zip"), exdir = arcPath)
+}
 
-f.record <- tibble::tibble (
-  order_label = o.record$order_label,
-  n = rep (0)
-)
+## data recording every orders (o.record)
+order_plan <- readr::read_csv(paste0(arcPath, "df-order.csv")) |>
+    dplyr::select(-`...1`)
 
-match.record <- tibble::tibble (p_id = "0",
-			order_label = "0")
-match.record <- match.record[-1, ]
+## plan for PHP
+order_counter <- readr::read_csv(paste0(arcPath, "df-plan.csv")) |>
+    dplyr::select(-`...1`) |>
+    dplyr::mutate(counter = 0)
+
+## match which participant got which order(match.order)
+matcher <- as.data.frame(matrix(nrow = 0, ncol = 2))
+colnames(matcher) <- c("p_id", "order_label")

@@ -21,10 +21,12 @@ function makeJsQuestion (questionArray, k) {
                     prompt: questionArray[i]['prompt'],
                     labels: questionArray[i]['choices']
                 }],
-                data: { Q_num: `0`+ (i+1) ,
-                        isDemo: false }
+                data: {
+		    // Q_num: "0"+ (i+1),
+		    Q_num: (i+1),
+                    isDemo: false }
             };
-        if (questionArray[i]['q_required'] == 'y') {
+        if (questionArray[i]['required'] == 'y') {
             trials[i].questions[0].required = true;
         } else {
             trials[i].questions[0].required = false;
@@ -33,7 +35,7 @@ function makeJsQuestion (questionArray, k) {
 };
 
 makeJsQuestion (questionArray, k);
-
+console.log(trials);
 let demoArray = await getScale('./demo.json');
 var demos = [];
 let l;
@@ -47,7 +49,7 @@ function makeJsDemo (demoArray, m) {
                 questions: [{
                     prompt: demoArray[l]['prompt']
                 }],
-                data: { Q_num: demoArray[l]['demo_var'],
+                data: { Q_num: demoArray[l]['label'],
                         isDemo: true }
             };
         if (demoArray[l]['choices'][0] === null) {
@@ -56,7 +58,7 @@ function makeJsDemo (demoArray, m) {
             demos[l]['type'] = jsPsychSurveyLikert;
             demos[l].questions[0].labels = demoArray[l]['choices'];
         };
-        if (demoArray[l]['d_required'] == 'y') {
+        if (demoArray[l]['required'] == 'y') {
             demos[l].questions[0].required = true;
         } else {
             demos[l].questions[0].required = false;

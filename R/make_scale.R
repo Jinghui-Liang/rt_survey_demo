@@ -3,62 +3,61 @@ if (file.exists ("/.dockerenv")) {
   outputDir <- "/var/www/html/"
 } else {
   if (interactive()) {
-    questPath <- "../scalepool/fullScale.csv"
+      questPath <- "../scalepool/fullscale.csv"
+      # questPath <- "../inject-order/fullscale.csv"
   } else {
     questPath <- paste0("./scalepool/", quest_name)
   }
   outputDir <- "./server/www/"
 }
 
-dat <- tibble::as_tibble (read.csv (questPath,
-				    header = TRUE,
-				    na.strings = "",
-				    fill = FALSE
-				    ))
+cat(questPath)
+
+dat <- readr::read_csv(questPath) |>
+    dplyr::mutate(choices = ifelse(choices == "NA", NA_real, choices),
+                  required = ifelse(required == "NA", NA_real, required))
 
 ## split out questionnaire part
-quest <- dat[, c("question", "q_choices", "q_required")] |> 
-  dplyr::filter(!is.na(question)) |> tibble::as_tibble()
-colnames(quest)[colnames(quest) == "question"] <- "prompt"
-colnames(quest)[colnames(quest) == "q_choices"] <- "choices"
+## quest <- dat[, c("question", "q_choices", "q_required")] |> 
+##   dplyr::filter(!is.na(question)) |> tibble::as_tibble()
+colnames(dat)[colnames(dat) == "question"] <- "prompt"
 
-if (any(quest$q_required != "y" & quest$q_required != "n")) {
-  print (quest$q_required)
-  stop ("Column q_required not properly defined.")
-}
+## convert demo items to JSON
+demo <- dat |> dplyr::filter(demographic == "y")
 
-if (!is.na(quest$choices[1])) {
-  if (sum (is.na(quest$choices)) == 0) {
-    quest_js <- quest |>
-      dplyr::mutate (choices = purrr::map(quest$choices,
-					  \(.x) unlist (strsplit(.x, split = "/"))))
-  } else if (sum (is.na(quest$choices)) == length (quest$choices) - 1) {
-    quest_js <- quest |> 
-      dplyr::mutate (choices = strsplit(quest$choices[1], split = "/"))
-  } else {
-    stop ('Column "q_choices" not properly defined.')
-  }
-}
+demo_js <- demo |>
+    dplyr::mutate(choices = ifelse(test = is.na(choices),
+                                   yes = list(NA),
+                                   no = sapply(choices,
+                                               \(.x) strsplit(.x, split = "/"),
+                                               USE.NAMES = FALSE)
+                                   ))
 
-scaleJSON <- jsonlite::toJSON(quest_js, pretty = TRUE)
-
-					# split out demographic part
-demo <- dat[, c("demo_var", "d_question", "d_choices", "d_required")] |> 
-  dplyr::filter(demo_var != "NA")
-colnames(demo)[colnames(demo) == "d_question"] <- "prompt"
-colnames(demo)[colnames(demo) == "d_choices"] <- "choices"
-
-demo_strvar <- demo |> 
-  dplyr::filter (is.na(demo$choices)) |> 
-  dplyr::mutate (choices = list (NA))
-
-demo_catvar <- demo |> 
-  dplyr::filter (!is.na(choices)) |> 
-  dplyr::mutate (choices = purrr::map(choices,
-				      \(.x) unlist (strsplit(.x, split = "/"))))
-demo_js <- dplyr::bind_rows(demo_strvar, demo_catvar)
+# demo_js <- dplyr::bind_rows(demo_strvar, demo_catvar)
 demoJSON <- jsonlite::toJSON(demo_js, pretty = TRUE)
 
+## convert scale to JSON
+quest <- dplyr::anti_join(dat, demo, by = "prompt") |>
+    dplyr::select(-demographic) |>    
+    dplyr::mutate(choices = ifelse(is.na(choices),
+                                   choices[which.max(!is.na(choices))],
+                                   choices
+                                   ),
+                  required = ifelse(is.na(required), "y", "n")
+                  )
+
+if (any(!quest$required %in% c("n", "y"))) {
+  print (quest$q_required)
+  stop ('Column "required" not properly defined.')
+}
+
+quest_js <- quest |>
+    dplyr::mutate (choices = sapply(quest$choices,
+                                    \(.x) strsplit(.x, split = "/"),
+                                    USE.NAMES = FALSE)) |> 
+  dplyr::select(-label)
+
+scaleJSON <- jsonlite::toJSON(quest_js, pretty = TRUE)
 
 write(scaleJSON, paste0(outputDir, "scale.json"))
 write(demoJSON, paste0(outputDir, "demo.json"))
