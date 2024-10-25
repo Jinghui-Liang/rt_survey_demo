@@ -20,7 +20,7 @@ try {
     $stmt = $pdo->prepare($querya);
     $stmt->execute($data);
 
-    $queryb = "UPDATE frequency_counter SET n = n + 1 WHERE order_label = ?";
+    $queryb = "UPDATE frequency_counter SET counter = counter + 1 WHERE order_label = ?";
     $stmt = $pdo->prepare($queryb);
     $stmt->execute(array($data[':order_label']));
 
