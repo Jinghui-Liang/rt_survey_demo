@@ -2,7 +2,7 @@ if(!interactive()) {
   prompt_position <- "Are you running local test or uploading your platform to a server? (local/server)"
   cat (prompt_position)
   position <- readLines("stdin", n = 1)
-
+  cat(position)
   ## ------ under development ------
   prompt_questionnaire <- "Which database you would like to down data from?" 
   ## ------
@@ -12,9 +12,11 @@ if(!interactive()) {
   verbose <- readLines("stdin", n = 1)
   readRenviron("./.env")
 } else {
-  localdb <- "fullScale"
+  localdb <- "fullscale"
   readRenviron("../.env")
 }
+
+localdb <- "fullscale"
 
 if (position == "local") {
   env_server <- '127.0.0.1'
@@ -24,27 +26,35 @@ if (position == "local") {
   stop ('arguments must be either "local" or "server"')
 }
 
-try ({
-  con_t <- DBI::dbConnect(
-                  RMariaDB::MariaDB(),
-                  host = env_server,
-                  port = Sys.getenv('SQL_PORT'),
-                  user = Sys.getenv('USR_NAME'),
-                  password = Sys.getenv('DB_PASS'),
-                  dbname = localdb)
-  },
-  error = stop (".env file not correctly configured.")
-)
+con_t <- DBI::dbConnect(
+  RMariaDB::MariaDB(),
+  host = env_server,
+  port = Sys.getenv('SQL_PORT'),
+  user = Sys.getenv('USR_NAME'),
+  password = Sys.getenv('DB_PASS'),
+  dbname = localdb)
+
+# tryCatch ({
+#   con_t <- DBI::dbConnect(
+#                   RMariaDB::MariaDB(),
+#                   host = env_server,
+#                   port = Sys.getenv('SQL_PORT'),
+#                   user = Sys.getenv('USR_NAME'),
+#                   password = Sys.getenv('DB_PASS'),
+#                   dbname = localdb)
+#   },
+#   error = stop (".env file not correctly configured.")
+# )
 
 
-response <- tbl (con_t, "response") |> dplyr::collect ()
-demo <- tbl (con_t, "demo") |> dplyr::collect () |> 
+response <- dplyr::tbl (con_t, "response") |> dplyr::collect ()
+demo <- dplyr::tbl (con_t, "demo") |> dplyr::collect () |> 
   dplyr::mutate (property = substr (property, 2, nchar(property) - 1)) |> 
   tidyr::pivot_wider(names_from = property,
                      values_from = value)
-frequency <- tbl (con_t, "frequency_counter") |> dplyr::collect ()
-order <- tbl (con_t, "order_list") |> dplyr::collect ()
-match <- tbl (con_t, "order_match") |> dplyr::collect ()
+frequency <- dplyr::tbl (con_t, "frequency_counter") |> dplyr::collect ()
+order <- dplyr::tbl (con_t, "order_list") |> dplyr::collect ()
+match <- dplyr::tbl (con_t, "order_match") |> dplyr::collect ()
 
 if (!interactive()) {
   dir_name <- paste0("./raw_data/results-", Sys.Date(), "-", format(Sys.time(), "%X"))
