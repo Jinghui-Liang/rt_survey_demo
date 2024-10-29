@@ -1,16 +1,11 @@
 ﻿question,choices,required,label,demographic
 What is your age?,,n,age,y
 What is your gender,male/female,n,gender,y
-What is your educational background?,high school/under graduate/postgraduate,n,education,y
-What is your email address?,,y,email,y
-What is your financial case?,low/mid/high,y,financial,y
-I am the life of the party.,"Very Inaccurate/Moderately
-Inaccurate/Very
-Accurate",y,E,
-I feel little concern for others.,,y,A,
-I am always prepared.,,n,C,
-I get stressed out easily.,,y,N,
-I have a rich vocabulary.,,n,O,
+I am the life of the party.,Inaccurate/Neutral/Accurate,y,E,
+I feel little concern for others.,,n,A,
+I am always prepared.,,,C,
+I get stressed out easily.,,,N,
+I have a rich vocabulary.,,,O,
 I don't talk a lot.,,,E,
 I am interested in people.,,,A,
 I leave my belongings around.,,,C,

@@ -4,15 +4,16 @@ if(!interactive()) {
   position <- readLines("stdin", n = 1)
   cat(position)
   ## ------ under development ------
-  prompt_questionnaire <- "Which database you would like to down data from?" 
+  prompt_questionnaire <- "Which database you would like to down data from?"
+  db_name <- readLines("stdin", n = 1)
+  cat(db_name)
   ## ------
-
   prompt_verbose <- "Do you want to download (f)ull data or just (r)esposne data? (f/r)"
   cat (prompt_verbose)
   verbose <- readLines("stdin", n = 1)
   readRenviron("./.env")
 } else {
-  localdb <- "fullscale"
+  db_name <- "fullscale"
   readRenviron("../.env")
 }
 
@@ -26,25 +27,17 @@ if (position == "local") {
   stop ('arguments must be either "local" or "server"')
 }
 
-con_t <- DBI::dbConnect(
-  RMariaDB::MariaDB(),
-  host = env_server,
-  port = Sys.getenv('SQL_PORT'),
-  user = Sys.getenv('USR_NAME'),
-  password = Sys.getenv('DB_PASS'),
-  dbname = localdb)
-
-# tryCatch ({
-#   con_t <- DBI::dbConnect(
-#                   RMariaDB::MariaDB(),
-#                   host = env_server,
-#                   port = Sys.getenv('SQL_PORT'),
-#                   user = Sys.getenv('USR_NAME'),
-#                   password = Sys.getenv('DB_PASS'),
-#                   dbname = localdb)
-#   },
-#   error = stop (".env file not correctly configured.")
-# )
+tryCatch ({
+  con_t <- DBI::dbConnect(
+                  RMariaDB::MariaDB(),
+                  host = env_server,
+                  port = Sys.getenv('SQL_PORT'),
+                  user = Sys.getenv('USR_NAME'),
+                  password = Sys.getenv('DB_PASS'),
+                  dbname = db_name)
+  },
+  error = stop (".env file not correctly configured.")
+)
 
 
 response <- dplyr::tbl (con_t, "response") |> dplyr::collect ()
