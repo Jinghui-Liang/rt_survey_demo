@@ -1,34 +1,28 @@
 * About
 
-Reaction time (RT) for items in psychometric questionnaires reflect participants' immediate mental status during their response processes. Yet none of the popular data collection platforms allow collecting individual RT for each item. This demo provides an environment to collect such data based on various programming languages (R / JavaScript / PHP / HTML) that interactively work. It also contains randomized and pseudorandomized design strategies to organize the presentation order of a questionnaire in order to explore item effects and sequential effects in psychometric survey.
+This is a free, open-source platform for generating online questionnaire surveys. It has a built-in shiny app, =inject-order= for arranging item sequence, including ten methods which have potential to improve reliability/validity in psychological assessments. Also, this platform can collect participants' reaction time (RT) for each item.
 
 * Quick start
 
 ** Installation and dependencies
 
-**Latest Update**: Users can only install docker on local machine and no other dependencies should be needed. Our new configuration should work well in a plain environment. However, if users would like to edit any code outside the container, they should have the following dependencies installed:
+This platform is containerized with [[https://www.docker.com/][Docker]] so users should have it installed on local machines. To access default functionalities, no external dependencies are needed. For advanced user who want to customize this platform, refer to [[*Advanced users]] for more information. To download this platform, put the lines below in terminal (or command prompt on Windows).
 
-- Node.js
-- Apache
-- MariaDB (version 10.4)
-- R (version 4.1 or above, with =tidyverse=, =DBI=, =jsonlite= packages installed)
-- Docker
-- PHP
-
-To download this platform, put the lines below in terminal (or command prompt on Windows).
 #+begin_src shell
 git clone https://github.com/Jinghui-Liang/rt_survey_demo.git
 #+end_src
 
 ** Using this survey with default settings
 
+A common workflow for this platform is, users install this platform and prepare their questionnaires. Then arrange item sequences with =inject-order=. Next, activate this platform and deploy database, tables, and launch the questionnaire. After the survey, users download the stored datasets from online database. Below is a step-by-step tutorial.
+
 *** Environment file
 
-This platform uses =.env= file to set up all connection configuration. This config allows you to test everything with your local machine. For Emacs user, use =C-u C-c C-v C-t= to tangle changes *ONLY* with this block. Or you can open =.env= with your preferred editor and change the config to the corresponding values, if you want to upload this platform to your server or make any changes. If you don't see it, inspect if you have set "showing hidden files".
+This platform uses =.env= file for configurations. It is a hidden file on the root directory of this platform. Default settings do not need to modify this file.
 
 #+begin_src text
 HTTP_PORT=8080
-SQL_PORT=3306
+SQL_PORT=3307
 USR_NAME=root
 SERVER_DB_NAME=test
 DB_PASS=example
@@ -36,153 +30,120 @@ MARIADB_VER=10.4
 COMPOSE_PROJECT=platform
 #+end_src
 
-*** Working examples
+*** Prepare: questionnaire and container
 
-"Type something within a pure text file then everything works?", I can see painful faces for people who are not having programming experience. However, we are trying our best to make everything as simple as possible. To illustrate this, you can try using our working examples. These examples are all locally done. The only thing you need is to figure out how to open terminal/power prompt, and getting skilful in typing.
+The first thing to do is to prepare a questionnaire file. This platform only accept comma separate variable ("csv") files for now. A (simplified) template of acceptable file should look like this:
 
-- Open terminal
-- Change directory (=cd=) to the place where =rt_survey_demo= stays
+#+begin_src R :export results :wrap org :colnames yes
+  dat <- suppressMessages(readr::read_csv("./scalepool/fullscale.csv"))
+  head(dat, 5)
+#+end_src
+
+#+RESULTS:
+#+begin_org
+| question                          | choices                     | required | label  | demographic |
+|-----------------------------------+-----------------------------+----------+--------+-------------|
+| What is your age?                 |                             | n        | age    | y           |
+| What is your gender               | male/female                 | n        | gender | y           |
+| I am the life of the party.       | Inaccurate/Neutral/Accurate | y        | E      |             |
+| I feel little concern for others. |                             | n        | A      |             |
+| I am always prepared.             |                             |          | C      |             |
+#+end_org
+
+Some requirements should be followed when organizing this questionnaire:
+
+- For column "question", each row only contains one question;
+- For column "choices", separate choices with slashes or leave it blank;
+  - For demographic items, blank cell in this column will allow the item to accept textural input;
+  - For scale items, blank cell in this column means corresponding items have the same choices as the first item with specified choices in this column.
+- For column "required", letter "n" means an item can be skipped, while letter "y" or a blank cell make an item unskippable.
+- For column "label", type the variable names for demographic items, and factor labels for scale items (i.e., which subscale an item belongs to).
+- Column "demographic" tells if an item is a demographic item or scale item. Only recognizing "y" as symbol of demographic items.
+
+A full template can be found [[file:scalepool/fullscale.csv][here]].
+
+This file should be stored on =surveypool= directory. Then, go to =inject-order= shiny app by executing two commands
+
+#+begin_src shell
+cd /path/to/rt_survey_demo
+Rscript shiny::runApp("inject-order")
+#+end_src
+
+or by accessing =app.R= to activate.
+
+Users will then be taken to the interface of =inject-order=, to arrange item sequences of this questionnaire, they should upload the csv file that is stored on "surveypool" directory. Successful submission will generate a preview on "data" panel. Then users should head to "order" panel to start organizing presentation orders and target sample sizes under each methods. Currently, this platform provides eleven methods to arrange presentation order, details of every method can be found [[file:inject-order/description.md][here]].
+
+Once the arrangement is finished, users can go to "plan" anal to inspect selected methods and corresponding sample sizes. For "fixed" collections (e.g., fx, gff, cff), all participants will receive the same presentation order. But for the rest methods, participants will receive sequences that is independently randomized. Users should click the download button on the top to download the compressed archive, =df-order.zip= to get the plan files. Decompressing is not needed because scripts later on will do so automatically.
+
+Next, we should start building the container. Change the working directory to where this platform is installed via the command line:
 
 #+begin_src shell
 cd /path/to/rt_survey_demo
 #+end_src
 
-- Then, type
+then build up and activate the docker container by typing:
 
 #+begin_src shell
-    docker-compose up -d --build
+  docker-compose up -d --build
+#+end_src
 
+Building this container will take couple minutes for the first time, depending on connection quality. When containers =survey_php= and =survey_db= are built, users can see prompts displayed on the terminal.
+
+Next, take over the "virtual system" inside the container and execute the built-in binary =ConfigDB= by typing:
+
+#+begin_src shell
   # after you notice you can type again
-    docker exec -it survey_php sh
-    cd /var
-    ./ConfigDB
-
-    Are you running local test or uploading your platform to a server? (local/server) local
-    The name of target questionnaire you would like to use, extension required: fullScale.csv
+  docker exec -it -w /var survey_php sh
+  ./ConfigDB
 #+end_src
 
-- When you see "Initialization done", go to your browser, type =127.0.0.1:8080=, you can see a well organized questionnaire is done.
+Successful execution generates a prompt, =Are you running local test or uploading your platform to a server? (local/server)=. Now we put =local= as the argument and hit return, then for the next prompt, =The name of target questionnaire you would like to use, extension required:=. We put the file name of the questionnaire just stored, =ipip20.csv= as the argument. Now =ConfigDB= will automatically configure the database and the survey. When you see "Initialization done", go to your browser, type =127.0.0.1:8080=, you can access the survey as a participant. At this point you would not know which presentation order you received.
 
-I hope this can make a sense that it's not that hard to use our platform. However, for detailed usages, there are still something you should know to get better online reaction-time-record survey with our system.
+You should see a welcome page, demographic items (if any), and a "start again" page displaying first, then scale item follows. The welcome page shows as a greeting (easy enough to understand). However, the "start again" page is not a duplicate one -- we actually start measuring participant's reaction time at this point and use it as our "baseline", because the only thing participants will do is reading and clicking -- no choosing process are needed for them. After all your questions are displayed, participants will see the ending page with a "submit" button. Their responses and all other data will not be saved to database unless they click that button.
 
-*** How to organize your questionnaire file
+*** Data
 
-Currently, this platform only accepts .csv format files. An example of this file looks like:
-
-| question                    | q_choices              | q_required | d_question                          | d_choices             | d_required |
-| Is today your lucky day?    | Disagree/Neutral/Agree | y          | How old are you?                    |                       | n          |
-| I feel so sad today.        |                        | n          | What's your educational background? | educated/not educated | n          |
-| Tomorrow can be better      |                        | n          | What's your email address?          |                       | y          |
-
-This .csv file integrated questions and demography information together. To specify your survey, you should follow couple rules:
-
-- Fill the =question= column with your questions, each row a question.
-- The =q_choices= column is for response options. Options should be separate by slashed (=/=), no spaces are needed before of after the slash. You should only place your options in either way of below, other ways you get errors in productive:
-  1. Putting choices on first row of =q_choices=, in this way they become the default of all questions;
-  2. Set different options for specific questions, then fill the rest with your default choices. By doing so only the questions you specified come with different number of choices, while the rest remaining the same.
-- The =q_required= column specifies if this question is forced to response. If =y=, participants can't skip this and see the next question (questions are appearing one by one on the screen). If =n=, they can.
-- The =d_question= specifies demography information questions before the question starts.
-- The =d_choices= specifies the type of demography information input. If choices or response options are needed, put it as the same as =q_choices=. Leaving this row blank will make the corresponding demography information accepts text input.
-- =d_required= is the same as =q_required=, but controls =d_question=.
-- *IMPORTANT*: please *DO NOT* change the column names.
-
-*** Test your questionnaire
-
-It's common that you would like to test everything before launching your survey. Regarding this case, we used a Docker container to build up a virtual development environment so that you have more flexibility to customize the development environment to suit your case.
-
-**** General Steps
-
-1. You don't have to change anything from =.env= unless you want to (descried below).
-2. Put =docker-compose up -d --build= to command line to activate the Docker container we papered for users.
-3. Prepare your questionnaire file in =.csv= format, and copy it to =./scalepool= directory.
-4. On your terminal put =docker exec -it survey_php sh= to get in the shell inside the container, =cd /var= then open the binary via =./ConfigDB=. Following the instruction, put =local= as your first argument to let =ConfigDB= know you are doing test. Press return, then type the name of your =.csv= questionnaire **WITH EXTENSION**. You can ignore "incomplete final line found" error which may appear during the execution.
+Only after a participant responds to all question (can skip items if specified) and click "submit" button at the end of this survey, their data will be stored in database. To download and inspect datasets, users can execute =download_rawdat.R= by command line:
 
 #+begin_src shell
-./ConfigDB
-
-Are you running local test or uploading your platform to a server? (local/server) local
-The name of target questionnaire you would like to use, extension required: your_questionnaire_name.csv
+  Rscript R/download-rawdat.R
 #+end_src
 
-5. When you see =Initialization done= display on your terminal, open your preferred browser and go to =localhost:8080= (MacOS/Linux) or =127.0.0.1:8080= (All operating system) to check if questionnaire are appropriate loaded.
-6. If you would like to manage your database:
-   - **outside** the docker image: go to the terminal and type: =mysql -h 127.0.0.1 -u root -P ${SQL_PORT} -p= (where ${SQL_PORT} is 3306 by default), or
-   - =docker exec -it survey_db sh= to call the shell **inside docker**, then =mysql -h 127.0.0.1 -u root -P 3306 -p= to access MariaDB;
-   - hit enter and type your password (you can see it from =.env=) or use preferred database management IDEs,
-   - you will find a database with the same name as your questionnaire without extension.
-7. When finishing testing, don't forget putting =docker-compose down= on your terminal to save some memory.
+Three prompts will be displayed to ask which database the data is stored in, and whether full datasets should be downloaded. For the first prompt, put =local= as the argument, For the second prompt, simply put the questionnaire name as the argument (=ipip20= in this example). For the last prompt, argument =f= will download demographic dataset, response dataset, and participant-order pairs dataset (recording which participant received which order), while =r= only downloads response dataset.
 
-**** Change the default
+Another way is, users can directly access =/R/download_rawdat.R= and change network connect environment inside, and download the data using =dplyr::tbl()= function.
 
-- Once =docker-compose up -d --build= is executed, two containers will be created based on =.env= settings. First, the =survey_php= container is used to connect to virtual MariaDB environment. While the =survey_db= is the virtual database container where your data (responses) will be stored into.
-- Connection between containers uses default port 3306. However, you can customize the "outside" port to your prefer ones to suit your case. For example, changing =SQL_PORT=3308= in =.env= allows you to connect to the database inside docker with terminal command =mysql -h 127.0.0.1 -u root -P 3308 -p=. But if you are assessing the database inside docker, the port will always be 3306. You can check which port is used by command =docker ps=.
-- When conducting local test with docker, variable =SERVER_DB_NAME= will be ignored because the MariaDB database name will always be your questionnaire name.
-- If you want to test different questionnaires with the same docker/connection configuration, please refer to [[What if I want to use another questionnaire?]] session. However, if you would like to change the external port, username or other connection settings, make sure do =docker-compose down= first, then modify and save =.env=, then execute =docker-compose up -d --build= again to verify your changes.
+*** Launch a survey
 
-*** Generate ready-to-use files
+If users have a host server, they can change the =.env= file on the root directory of this platform in order to match connection environment, including online database name, username, http port, and password. Then, enter the container and execute =ConfigDB= again. This time, take =server= as the argument for the first prompt, while remain everything else unchanged. Downloading dataset from server follows the same procedure as [[*Data]] section, but make sure =.env= is properly configure to connect to the database in host server.
 
-For users who have prepared an online database and know its configuration, that can prepare their questionnaire file like described above. Then you can edit =.env= to match their network/database setting. Execute =./ConfigDB=, put =server= as your first argument and your questionnaire name *WITH EXTENSION* as the second one. Scripts will configure everything and send them to your online database. When you see =Initialization done= display on your terminal, that you want to access =./server/www=, and =www= folder is the wrapper you would like to submit to server.
+** Advanced users
 
-*** What should be seen from the browser
+*** Customize this platform
 
-Regardless what kind of settings you've done, you should see a welcome page, demography questions (if you have ones), and a "start again" page displaying first, then your questionnaire follows. The welcome page shows as a greeting (easy enough to understand). However, the "start again" page is not a duplicate one -- we actually start measuring participant's reaction time at this point and use it as our "baseline", because the only thing participants will do is reading and clicking -- no choosing process are needed for them. After all your questions are displayed, participants will see the ending page with a "submit" button. Their responses and all other data will not be saved to database unless they click that button.
+If users would like to extend/modify functionalities of this platform, the following dependencies should be installed locally:
 
-(under development) Text of welcome page and ending pages are changeable. Check out the =server/www/welcome.js= file and edit the context, and you're good to go.
+- Node.js
+- Apache
+- MariaDB (version 10.4 or greater)
+- R version 4.1 or greater, with the following packages:
+  - =tidyverse=, =DBI=, =RMariaDB=, =RMariaDB=, =jsonlite=, =shiny=
+- Docker
+- PHP
 
-*** What if I want to use another questionnaire?
+Please refer to [[file:all_config.org][all_config.org]] to check all scripts.
 
-Just prepare another =.csv= file and move that to =./scalepool= as you did. Then run the =ConfigDB= with corresponding argument. Done.
+*** Access databases outside the container
 
-- For launching your survey online, notice that your previous =www= folder will be covered. Make sure you've had a copy of that, or you are okay with the cover.
-- For local test, =ConfigDB= will generate a new database based on your questionnaire name.
-
-*** Presentation orders
-
-This platform does the following to deploy different kinds of presentation order:
-
-- First, our built-in R scripts generate a table containing =fixed=, =latin-square=, and =complete randomization= orders, where =fixed= order is exactly the same as your question arranged in your =.csv= file; =latin-square= is an n * n matrix (n is the length of the questionnaire). System treats each row as a presentation order. Take a 3-item questionnaire as an example, the generated latin-square will be like:
-
-| 1 | 2 | 3 |
-| 3 | 1 | 2 |
-| 2 | 3 | 1 |
-
-So participants will possibly receive the questionnaire with questions displaying following one of orders =2nd, 3rd, 1st=, =1st, 2nd, 3rd=, or =3rd, 1st, 2nd= compared to their original arrangement (counterbalanced design).
-
-=complete randomization= will generate an n * n fully randomized presentation order matrix (fully randomized design). System treats each row of this matrix as a presentation order. Again, n means the length of your questionnaire.
-
-- The table including all these orders will be sent to specific database as user-defined, being saved in =MariaDB= table called "order_list".
-- Every time the survey starts, system randomly select a row as presentation order and organize all questions based on this.
-
-- To maintain balanced design, once a specific presentation order has reached a number of assignment frequency, system will no longer use that unless the frequency is reset (described later). By default, the maximal assignment frequency of =fixed= order is 100, 2 for each row of =latin-square=, and =2= for each row of =complete randomization=. With these settings, it's hopefully we can have 300 participants if we are using a 50-item long questionnaire. 
-
-- However, we found that in production, it's common that orders can be assigned more than our expectation. That's because our built-in counter won't refresh itself until new data has been submitted.
-
-- Users has full control about how they want the presentation orders are like. To modify the presentation order, please edit =R/generate_order.R= (see below for more details). At this point the script might look a bit complicated, but we will work on that to make it easier to be understood, and we will also add more quasirandomization strategies to organize the presentation order of questionnaires.
-
-*** Downloading your data
-
-In this part you are mostly possible to be in a Rstudio or Emacs environment since you might be ready to analysing your data with them. If you want to get the data you collected, open =R/check_response.R= with Rstudio or Emacs and run all lines in it. Table =response= is the survey data, =frequency= records how many times each presentation orders were assigned (to help you make sure if your study is "balanced" enough), =order= records all presentation orders used in your survey. Finally, =match= records which participant (identified by an anonymous reference code) received which presentation order.
-
-*** Extend your survey (Under Development)
-
-The assignment of presentation order is controlled by =server/www/matchOrder.php=. You can keep your survey running without any restriction by editing MySQL queries in it. However, to make sure the balanced design, we set up some rules to avoid a specific order being assigned for too many times (described below). These rules and requirements are calculated according to table =frequency_counter= in MySQL database. When requirement are met, anyone who log in to the survey URL will see a message:
-
-'This survey is closed, thanks for your interest to participate.' 
-
-displayed on the web page. If you want to recruit more participants, you can either modify =matchOrder.php= or run the command line below.
+The default of this platform does not explore the database container. But if users would like to inspect it, use =mysql= command:
 
 #+begin_src shell
-Rscript R/reset_counter.R
+mysql -h 127.0.0.1 -u root -P 3307 -p
 #+end_src
 
-It will return each value in =frequency_counter= to zero and start the survey again. All collected data won't be affected.
+default password can be found on =.env=. Notice that for higher version of MySQL, there might be a "SSL" error when trying to access MariaDB with unclear reason. But users can add =--skip_ssl= as an argument to skip authentication.
 
-*** All configuration and future upgrades
+*** Use your own item arrangement algorithm
 
-For users who want to inspect the underlying codes, they can either open all the source code and do the hard code. Also, the whole management is done via an [[./all_config.org][all_config.org]] file. Emacs users can tangle (=C-c C-v C-t= for all source blocks, =C-u C-c C-v C-t= for a specific block where your courser stays) changes.
-
-For one who's wanting to explore the basis of this platform we believe you can safely close this page now. However, we actually developed couple practical functions for researchers to have more possibility to combine quasirandomization, reaction time, and response together, therefore having more detailed understanding about immediate psychological status changes. So next time the following pieces will be upgraded and included into the "Quick Start" part:
-
-- Code descriptions in [[./all_config.org][all_config.org]].
-- Enlarging your sample.
-
+- If you would like to arrange item sequences by customize R functions, add them to =./inject-order/default.R=, and modify =ui= in =app.R=
+- If you already have a order list and plan (like the two csv files inside the downloaded =df-order.zip=), compress them and replace the downloaded one, no need to use =inject-order= to customize.
